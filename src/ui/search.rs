@@ -108,7 +108,7 @@ impl SearchBar {
                 let api_key = settings::get().geoapify_api_key;
                 let (sender, receiver) = async_channel::bounded(1);
 
-                glib::spawn_future_local(async move {
+                crate::runtime::spawn(async move {
                     let res = search_places(&text, &api_key).await;
                     let _ = sender.send((next_id, res)).await;
                 });

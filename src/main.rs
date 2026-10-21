@@ -1,7 +1,9 @@
 mod app;
+mod control;
 mod integration;
 mod location;
 mod providers;
+mod runtime;
 mod settings;
 mod settings_dialog;
 mod storage;
@@ -12,6 +14,16 @@ use app::MapsApp;
 use integration::handle_cli_api;
 
 fn main() -> glib::ExitCode {
+    nixe_core::app::init(nixe_core::app::App {
+        slug: "nixe-maps",
+        name: "Maps",
+    });
+
+    if std::env::var_os("GSK_RENDERER").is_none() {
+        // SAFETY: still single-threaded; nothing else reads the environment yet.
+        unsafe { std::env::set_var("GSK_RENDERER", "ngl") };
+    }
+
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     // Headless API query check for Nixe Assistant / scripts

@@ -1,4 +1,5 @@
-use crate::integration::{DeepLink, MapCommand, parse_deep_link, start_dbus_server};
+use crate::control;
+use crate::integration::{parse_deep_link, DeepLink};
 use crate::theme;
 use crate::ui::MainWindow;
 use gio::prelude::*;
@@ -6,12 +7,10 @@ use gtk::glib;
 use gtk::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::mpsc;
 
 pub struct MapsApp {
     app: gtk::Application,
     main_window: Rc<RefCell<Option<Rc<MainWindow>>>>,
-    cmd_receiver: Rc<RefCell<Option<mpsc::Receiver<MapCommand>>>>,
 }
 
 impl MapsApp {
@@ -21,63 +20,28 @@ impl MapsApp {
             .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE | gio::ApplicationFlags::HANDLES_OPEN)
             .build();
 
-        let (cmd_tx, cmd_rx) = mpsc::channel();
-
-        // Spawn D-Bus server in background tokio runtime
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-            rt.block_on(async {
-                let _ = start_dbus_server(cmd_tx).await;
-            });
-        });
-
         Self {
             app,
             main_window: Rc::new(RefCell::new(None)),
-            cmd_receiver: Rc::new(RefCell::new(Some(cmd_rx))),
         }
     }
 
     pub fn run(&self) -> glib::ExitCode {
-        self.app.connect_startup(|_| {
+        let win_ctrl = self.main_window.clone();
+        self.app.connect_startup(move |app| {
             theme::install();
+            let win_ref = win_ctrl.clone();
+            nixe_core::control::serve_async(app, control::tools(), move |name, args, reply| {
+                control::handle(name, args, win_ref.clone(), reply);
+            });
         });
 
         let win_ref = self.main_window.clone();
-        let cmd_rx_cell = self.cmd_receiver.clone();
-
         self.app.connect_activate(move |application| {
             if win_ref.borrow().is_none() {
                 let win = MainWindow::build(application);
                 win.window.present();
-                *win_ref.borrow_mut() = Some(win.clone());
-
-                // Poll for incoming D-Bus commands on GTK main loop
-                if let Some(rx) = cmd_rx_cell.borrow_mut().take() {
-                    let win_for_cmds = win.clone();
-                    glib::timeout_add_local(std::time::Duration::from_millis(50), move || {
-                        while let Ok(cmd) = rx.try_recv() {
-                            match cmd {
-                                MapCommand::ShowLocation { lat, lon, label } => {
-                                    win_for_cmds.open_location(lat, lon, &label);
-                                    win_for_cmds.window.present();
-                                }
-                                MapCommand::Search { query } => {
-                                    win_for_cmds.search_query(&query);
-                                    win_for_cmds.window.present();
-                                }
-                                MapCommand::ShowRoute { start, end, mode } => {
-                                    win_for_cmds.open_route(start, end, &mode);
-                                    win_for_cmds.window.present();
-                                }
-                            }
-                        }
-                        glib::ControlFlow::Continue
-                    });
-                }
+                *win_ref.borrow_mut() = Some(win);
             } else if let Some(ref win) = *win_ref.borrow() {
                 win.window.present();
             }

@@ -484,7 +484,7 @@ impl MainWindow {
         self.show_toast("Locating...");
 
         let (sender, receiver) = async_channel::bounded(1);
-        glib::spawn_future_local(async move {
+        crate::runtime::spawn(async move {
             let res = request_current_location().await;
             let _ = sender.send(res).await;
         });
@@ -551,8 +551,14 @@ impl MainWindow {
         let t_mode = crate::providers::TravelMode::from_str(mode);
         let api_key = settings::get().geoapify_api_key;
 
+        let (sender, receiver) = async_channel::bounded(1);
+        crate::runtime::spawn(async move {
+            let res = crate::providers::calculate_route(start, end, t_mode, &api_key).await;
+            let _ = sender.send(res).await;
+        });
+
         glib::spawn_future_local(async move {
-            if let Ok(route) = crate::providers::calculate_route(start, end, t_mode, &api_key).await {
+            if let Ok(Ok(route)) = receiver.recv().await {
                 mv.show_route(&route.coordinates);
                 mv.center_on(start.0, start.1, None);
             }

@@ -1,8 +1,6 @@
 pub mod cli_api;
-pub mod dbus;
 
 pub use cli_api::handle_cli_api;
-pub use dbus::{MapCommand, start_dbus_server};
 
 #[derive(Debug, PartialEq)]
 pub enum DeepLink {

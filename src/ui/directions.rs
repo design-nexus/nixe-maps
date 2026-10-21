@@ -228,7 +228,7 @@ impl DirectionsPanel {
             let d_coords = *cd_c.borrow();
             let db_inner = db_c.clone();
 
-            glib::spawn_future_local(async move {
+            crate::runtime::spawn(async move {
                 // Resolve origin coordinates if needed
                 let origin = match o_coords {
                     Some(c) => Some(c),
