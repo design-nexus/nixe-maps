@@ -150,16 +150,22 @@ impl MainWindow {
         zoom_box.set_margin_end(16);
         zoom_box.set_margin_bottom(16);
 
-        let zoom_in_btn = gtk::Button::with_label("+");
+        let zoom_in_btn = gtk::Button::new();
         zoom_in_btn.add_css_class("map-control-btn");
-        zoom_in_btn.set_tooltip_text(Some("Zoom In"));
+        let zin_icon = gtk::Image::from_icon_name("zoom-in-symbolic");
+        zin_icon.set_pixel_size(16);
+        zoom_in_btn.set_child(Some(&zin_icon));
+        zoom_in_btn.set_tooltip_text(Some("Zoom in (+)"));
         let mv_zin = map_view.clone();
         zoom_in_btn.connect_clicked(move |_| mv_zin.zoom_in());
         zoom_box.append(&zoom_in_btn);
 
-        let zoom_out_btn = gtk::Button::with_label("−");
+        let zoom_out_btn = gtk::Button::new();
         zoom_out_btn.add_css_class("map-control-btn");
-        zoom_out_btn.set_tooltip_text(Some("Zoom Out"));
+        let zout_icon = gtk::Image::from_icon_name("zoom-out-symbolic");
+        zout_icon.set_pixel_size(16);
+        zoom_out_btn.set_child(Some(&zout_icon));
+        zoom_out_btn.set_tooltip_text(Some("Zoom out (−)"));
         let mv_zout = map_view.clone();
         zoom_out_btn.connect_clicked(move |_| mv_zout.zoom_out());
         zoom_box.append(&zoom_out_btn);
@@ -490,10 +496,12 @@ impl MainWindow {
             if let Ok(res) = receiver.recv().await {
                 match res {
                     Ok(loc) => {
-                        self_c.map_view.center_on(loc.latitude, loc.longitude, Some(15.0));
+                        self_c.map_view.center_on(loc.latitude, loc.longitude, Some(14.0));
                         self_c.map_view.set_user_location(loc.latitude, loc.longitude);
-                        self_c.show_toast(&format!("Location found (±{:.0}m)", loc.accuracy));
+                        let name = loc.label.unwrap_or_else(|| "Current Location".to_string());
+                        self_c.show_toast(&format!("Located: {} (±{:.0}m)", name, loc.accuracy));
                         self_c.directions_panel.set_origin(loc.latitude, loc.longitude, "My Location");
+                        self_c.coords_lbl.set_text(&format!("{:.4}, {:.4}", loc.latitude, loc.longitude));
                     }
                     Err(e) => {
                         self_c.show_toast(&format!("Location unavailable: {}", e));

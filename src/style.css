@@ -61,25 +61,34 @@ window.maps-window {
     margin: 16px;
 }
 
-.map-control-btn {
-    min-width: 32px;
-    min-height: 32px;
+window.maps-window button.map-control-btn {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
     border-radius: 6px;
     background-color: @theme_surface;
     border: 1px solid @hairline;
+    box-shadow: 0 4px 12px @theme_shadow;
     color: @theme_text;
-    font-weight: 600;
-    box-shadow: 0 2px 6px @theme_shadow;
+    opacity: 0.95;
 }
 
-.map-control-btn:hover {
+window.maps-window button.map-control-btn image {
+    color: @theme_text;
+}
+
+window.maps-window button.map-control-btn:hover {
     background-color: @row_hover;
+    border-color: @theme_accent;
+    opacity: 1.0;
 }
 
-.map-control-btn.active {
-    background-color: @nav_active;
+window.maps-window button.map-control-btn:hover image {
     color: @theme_accent;
-    border-color: @theme_accent;
+}
+
+window.maps-window button.map-control-btn:active {
+    background-color: @nav_active;
 }
 
 /* Contextual Side Panel */
