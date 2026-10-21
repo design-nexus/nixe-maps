@@ -1,0 +1,260 @@
+/* Nixe Maps Stylesheet - Follows STYLE.md */
+
+window.maps-window {
+    background-color: @theme_bg;
+    color: @theme_text;
+    font-family: "JetBrains Mono", "JetBrainsMono Nerd Font", monospace;
+}
+
+/* Top bar */
+.maps-topbar {
+    min-height: 46px;
+    padding: 0 12px;
+    border-bottom: 1px solid @hairline;
+    background-color: @theme_bg;
+}
+
+.maps-title {
+    font-size: 1em;
+    font-weight: 500;
+    color: @theme_dim_text;
+}
+
+.maps-title-accent {
+    color: @theme_accent;
+}
+
+/* Search bar in topbar */
+.maps-search-entry {
+    min-height: 32px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid @hairline;
+    color: @theme_text;
+    padding: 0 8px;
+    min-width: 300px;
+}
+
+.maps-search-entry:focus-within {
+    border-color: @theme_accent;
+}
+
+/* Map Style Selector */
+.style-selector {
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid @hairline;
+    background: transparent;
+    color: @theme_text;
+    font-size: 0.9em;
+}
+
+.style-selector:hover {
+    background-color: @row_hover;
+}
+
+/* Floating overlay controls over the map */
+.map-floating-controls {
+    margin: 16px;
+}
+
+.map-control-btn {
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 6px;
+    background-color: @theme_surface;
+    border: 1px solid @hairline;
+    color: @theme_text;
+    box-shadow: 0 2px 6px @theme_shadow;
+}
+
+.map-control-btn:hover {
+    background-color: @row_hover;
+}
+
+.map-control-btn.active {
+    background-color: @nav_active;
+    color: @theme_accent;
+    border-color: @theme_accent;
+}
+
+/* Contextual Side Panel */
+.context-panel {
+    background-color: @theme_bg;
+    border-right: 1px solid @hairline;
+    width: 360px;
+    min-width: 320px;
+    max-width: 420px;
+}
+
+.panel-header {
+    min-height: 46px;
+    padding: 0 16px;
+    border-bottom: 1px solid @hairline;
+}
+
+.panel-title {
+    font-weight: 600;
+    font-size: 1em;
+    color: @theme_text;
+}
+
+.panel-body {
+    padding: 14px 16px;
+}
+
+/* Search Results List */
+.search-results-list {
+    background-color: @theme_surface;
+    border: 1px solid @hairline;
+    border-radius: 10px;
+}
+
+.search-result-row {
+    padding: 8px 12px;
+    border-bottom: 1px solid @divider;
+}
+
+.search-result-row:hover {
+    background-color: @row_hover;
+}
+
+.search-result-row:selected {
+    background-color: @nav_active;
+}
+
+.place-title {
+    font-weight: 600;
+    font-size: 0.95em;
+    color: @theme_text;
+}
+
+.place-desc {
+    font-size: 0.85em;
+    color: @theme_dim_text;
+}
+
+/* Directions Panel */
+.directions-box {
+    margin-bottom: 12px;
+}
+
+.waypoint-entry {
+    min-height: 32px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid @hairline;
+    color: @theme_text;
+    padding: 0 8px;
+}
+
+.waypoint-entry:focus {
+    border-color: @theme_accent;
+}
+
+.travel-mode-btn {
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid @hairline;
+    background: transparent;
+    color: @theme_dim_text;
+}
+
+.travel-mode-btn:hover {
+    background-color: @row_hover;
+    color: @theme_text;
+}
+
+.travel-mode-btn.active {
+    background-color: @nav_active;
+    color: @theme_text;
+    border-color: @theme_accent;
+    font-weight: 600;
+}
+
+.route-summary-card {
+    border: 1px solid @hairline;
+    border-radius: 10px;
+    padding: 12px;
+    margin: 8px 0;
+    background-color: @lift;
+}
+
+.route-stat-value {
+    font-weight: 600;
+    font-size: 1.1em;
+    color: @theme_accent;
+}
+
+.route-stat-label {
+    font-size: 0.82em;
+    color: @theme_dim_text;
+}
+
+/* Step instruction */
+.step-row {
+    padding: 8px 6px;
+    border-bottom: 1px solid @divider;
+}
+
+.step-text {
+    font-size: 0.9em;
+    color: @theme_text;
+}
+
+.step-distance {
+    font-size: 0.8em;
+    color: @theme_dim_text;
+}
+
+/* Status Bar */
+.maps-statusbar {
+    min-height: 34px;
+    padding: 0 12px;
+    border-top: 1px solid @hairline;
+    background-color: @theme_bg;
+    color: @theme_dim_text;
+    font-size: 0.86em;
+}
+
+/* Place details card */
+.place-card {
+    border: 1px solid @hairline;
+    border-radius: 10px;
+    padding: 16px;
+    margin: 10px 0;
+    background-color: @lift;
+}
+
+/* Toast */
+.maps-toast {
+    background-color: @theme_surface;
+    color: @theme_text;
+    border: 1px solid @hairline;
+    border-radius: 10px;
+    padding: 10px 18px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 12px @theme_shadow;
+}
+
+/* Bar buttons */
+.bar-button {
+    min-width: 30px;
+    min-height: 30px;
+    border-radius: 6px;
+    padding: 4px;
+    background: transparent;
+    border: none;
+    color: @theme_dim_text;
+}
+
+.bar-button:hover {
+    background-color: @row_hover;
+    color: @theme_text;
+}
+
+.bar-button:active {
+    background-color: @nav_active;
+}

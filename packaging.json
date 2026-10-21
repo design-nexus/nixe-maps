@@ -1,0 +1,8 @@
+{
+  "name": "nixe-maps",
+  "version": "0.1.0",
+  "app_id": "io.github.design_nexus.nixe.Maps",
+  "description": "Lightweight, native Linux desktop mapping application for Omarchy and Nixe",
+  "binary": "nixe-maps",
+  "categories": ["Utility", "Maps", "Geography"]
+}

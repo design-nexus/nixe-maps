@@ -1,0 +1,188 @@
+use anyhow::{Result, bail};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub name: String,
+    pub formatted_address: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub category: Option<String>,
+}
+
+pub fn parse_coordinates(input: &str) -> Option<(f64, f64)> {
+    let trimmed = input.trim();
+    let parts: Vec<&str> = if trimmed.contains(',') {
+        trimmed.split(',').collect()
+    } else if trimmed.contains(' ') {
+        trimmed.split_whitespace().collect()
+    } else {
+        return None;
+    };
+
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let lat = parts[0].trim().parse::<f64>().ok()?;
+    let lon = parts[1].trim().parse::<f64>().ok()?;
+
+    if (-90.0..=90.0).contains(&lat) && (-180.0..=180.0).contains(&lon) {
+        Some((lat, lon))
+    } else {
+        None
+    }
+}
+
+// Geoapify Geocoding API response format
+#[derive(Debug, Deserialize)]
+struct GeoapifyResponse {
+    results: Option<Vec<GeoapifyPlace>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeoapifyPlace {
+    formatted: Option<String>,
+    name: Option<String>,
+    address_line1: Option<String>,
+    address_line2: Option<String>,
+    lat: f64,
+    lon: f64,
+    category: Option<String>,
+    result_type: Option<String>,
+}
+
+// Nominatim Geocoding API response format (fallback)
+#[derive(Debug, Deserialize)]
+struct NominatimPlace {
+    display_name: String,
+    name: Option<String>,
+    lat: String,
+    lon: String,
+    #[serde(rename = "type")]
+    place_type: Option<String>,
+}
+
+pub async fn search_places(query: &str, api_key: &str) -> Result<Vec<SearchResult>> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // 1. Direct coordinate match
+    if let Some((lat, lon)) = parse_coordinates(query) {
+        return Ok(vec![SearchResult {
+            name: format!("{:.5}, {:.5}", lat, lon),
+            formatted_address: format!("Latitude: {:.5}, Longitude: {:.5}", lat, lon),
+            lat,
+            lon,
+            category: Some("Coordinate".to_string()),
+        }]);
+    }
+
+    let client = reqwest::Client::builder()
+        .user_agent("nixe-maps/1.0 (https://github.com/design-nexus/nixe-maps)")
+        .build()?;
+
+    // 2. Geoapify API if key configured
+    if !api_key.trim().is_empty() {
+        let url = format!(
+            "https://api.geoapify.com/v1/geocode/search?text={}&format=json&apiKey={}&limit=6",
+            urlencoding::encode(query),
+            api_key.trim()
+        );
+
+        let resp = client.get(&url).send().await?;
+        if resp.status().is_success() {
+            let data: GeoapifyResponse = resp.json().await?;
+            if let Some(places) = data.results {
+                let results = places
+                    .into_iter()
+                    .map(|p| {
+                        let name = p.name
+                            .or(p.address_line1)
+                            .unwrap_or_else(|| "Place".to_string());
+                        let formatted = p.formatted
+                            .or(p.address_line2)
+                            .unwrap_or_else(|| name.clone());
+                        SearchResult {
+                            name,
+                            formatted_address: formatted,
+                            lat: p.lat,
+                            lon: p.lon,
+                            category: p.category.or(p.result_type),
+                        }
+                    })
+                    .collect();
+                return Ok(results);
+            }
+            return Ok(Vec::new());
+        } else if resp.status().as_u16() == 429 {
+            bail!("Geoapify daily quota or rate limit exceeded.");
+        } else if resp.status().as_u16() == 401 || resp.status().as_u16() == 403 {
+            bail!("Invalid or expired Geoapify API key.");
+        }
+    }
+
+    // 3. Nominatim Fallback (Zero-config out of box)
+    let url = format!(
+        "https://nominatim.openstreetmap.org/search?format=json&q={}&limit=5",
+        urlencoding::encode(query)
+    );
+
+    let resp = client.get(&url).send().await?;
+    if resp.status().is_success() {
+        let places: Vec<NominatimPlace> = resp.json().await?;
+        let results = places
+            .into_iter()
+            .filter_map(|p| {
+                let lat = p.lat.parse::<f64>().ok()?;
+                let lon = p.lon.parse::<f64>().ok()?;
+                let name = p.name.unwrap_or_else(|| {
+                    p.display_name.split(',').next().unwrap_or("Place").trim().to_string()
+                });
+                Some(SearchResult {
+                    name,
+                    formatted_address: p.display_name,
+                    lat,
+                    lon,
+                    category: p.place_type,
+                })
+            })
+            .collect();
+        return Ok(results);
+    }
+
+    Ok(Vec::new())
+}
+
+mod urlencoding {
+    pub fn encode(s: &str) -> String {
+        let mut encoded = String::new();
+        for b in s.bytes() {
+            match b {
+                b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                    encoded.push(b as char);
+                }
+                _ => {
+                    encoded.push_str(&format!("%{:02X}", b));
+                }
+            }
+        }
+        encoded
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_coordinates() {
+        assert_eq!(parse_coordinates("36.1627, -86.7816"), Some((36.1627, -86.7816)));
+        assert_eq!(parse_coordinates("35.1495,-90.0490"), Some((35.1495, -90.0490)));
+        assert_eq!(parse_coordinates("   40.7128   -74.0060  "), Some((40.7128, -74.0060)));
+        assert_eq!(parse_coordinates("100.0, 50.0"), None); // Invalid lat
+        assert_eq!(parse_coordinates("Nashville"), None);
+    }
+}

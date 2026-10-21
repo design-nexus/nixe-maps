@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Maps
+GenericName=Map Viewer
+Comment=Explore maps, search places, and get directions
+Exec=nixe-maps %U
+Icon=io.github.design_nexus.nixe.Maps
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Utility;Geography;Maps;
+StartupNotify=true
+MimeType=x-scheme-handler/geo;x-scheme-handler/nixe-maps;
