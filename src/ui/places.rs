@@ -25,6 +25,7 @@ impl PlaceCard {
     ) -> Self {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
         root.add_css_class("place-card");
+        root.set_hexpand(false);
 
         // Header with title and close button
         let header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -144,17 +145,25 @@ pub struct SavedPlacesView {
 impl SavedPlacesView {
     pub fn new(db: Database, on_select: impl Fn(FavoritePlace) + 'static) -> Self {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 6);
-        root.set_hexpand(true);
+        root.set_hexpand(false);
+        root.add_css_class("panel-body");
 
         let title = gtk::Label::new(Some("SAVED PLACES"));
-        title.add_css_class("group-title");
+        title.add_css_class("panel-title");
         title.set_xalign(0.0);
         title.set_margin_bottom(4);
         root.append(&title);
 
         let list_box = gtk::ListBox::new();
+        list_box.set_hexpand(false);
         list_box.add_css_class("group-list");
-        root.append(&list_box);
+
+        let scroller = gtk::ScrolledWindow::new();
+        scroller.set_hexpand(false);
+        scroller.set_vexpand(true);
+        scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+        scroller.set_child(Some(&list_box));
+        root.append(&scroller);
 
         let db_c = db.clone();
         let view = Self {

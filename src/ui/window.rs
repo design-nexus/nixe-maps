@@ -99,16 +99,12 @@ impl MainWindow {
         topbar.append(&search_holder);
 
         // Directions Button
-        let directions_toggle = widgets::bar_button("route-symbolic", "Directions (Ctrl+R)");
+        let directions_toggle = widgets::bar_button("directions-symbolic", "Directions (Ctrl+R)");
         topbar.append(&directions_toggle);
 
         // Locate Me Button
         let locate_btn = widgets::bar_button("find-location-symbolic", "Find my location");
         topbar.append(&locate_btn);
-
-        // Settings Button
-        let settings_btn = widgets::bar_button("emblem-system-symbolic", "Settings (Ctrl+,)");
-        topbar.append(&settings_btn);
 
         main_vbox.append(&topbar);
 
@@ -120,11 +116,13 @@ impl MainWindow {
         // Contextual Side Panel
         let side_panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
         side_panel.add_css_class("context-panel");
+        side_panel.set_hexpand(false);
+        side_panel.set_size_request(320, -1);
         side_panel.set_visible(false);
 
         let panel_stack = gtk::Stack::new();
         panel_stack.set_transition_type(gtk::StackTransitionType::Crossfade);
-        panel_stack.set_hexpand(true);
+        panel_stack.set_hexpand(false);
         panel_stack.set_vexpand(true);
         side_panel.append(&panel_stack);
 
@@ -190,6 +188,14 @@ impl MainWindow {
         let attribution_lbl = gtk::Label::new(Some(cur_style.attribution()));
         attribution_lbl.add_css_class("dim");
         statusbar.append(&attribution_lbl);
+
+        let overlay_gear = overlay.clone();
+        let win_gear = window.clone();
+        let db_gear = database.clone();
+        let gear_btn = chrome::gear(move || {
+            settings_dialog::open(&overlay_gear, &win_gear, db_gear.clone());
+        });
+        statusbar.append(&gear_btn);
 
         main_vbox.append(&statusbar);
         overlay.set_child(Some(&main_vbox));
@@ -299,7 +305,6 @@ impl MainWindow {
             sidebar_toggle,
             directions_toggle,
             locate_btn,
-            settings_btn,
             btn_std,
             btn_topo,
             btn_sat,
@@ -314,7 +319,6 @@ impl MainWindow {
         sidebar_toggle: gtk::Button,
         directions_toggle: gtk::Button,
         locate_btn: gtk::Button,
-        settings_btn: gtk::Button,
         btn_std: gtk::Button,
         btn_topo: gtk::Button,
         btn_sat: gtk::Button,
@@ -373,14 +377,6 @@ impl MainWindow {
         let self_loc = self.clone();
         locate_btn.connect_clicked(move |_| {
             self_loc.locate_user();
-        });
-
-        // Settings Dialog
-        let overlay_c = self.overlay.clone();
-        let win_c = self.window.clone();
-        let db_c = self.db.clone();
-        settings_btn.connect_clicked(move |_| {
-            settings_dialog::open(&overlay_c, &win_c, db_c.clone());
         });
 
         // Style switcher buttons

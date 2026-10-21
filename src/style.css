@@ -18,6 +18,7 @@ window.maps-window {
     font-size: 1em;
     font-weight: 500;
     color: @theme_dim_text;
+    margin-right: 6px;
 }
 
 .maps-title-accent {
@@ -31,8 +32,8 @@ window.maps-window {
     background: transparent;
     border: 1px solid @hairline;
     color: @theme_text;
-    padding: 0 8px;
-    min-width: 300px;
+    padding: 0 10px;
+    min-width: 280px;
 }
 
 .maps-search-entry:focus-within {
@@ -46,12 +47,13 @@ window.maps-window {
     border-radius: 6px;
     border: 1px solid @hairline;
     background: transparent;
-    color: @theme_text;
+    color: @theme_dim_text;
     font-size: 0.9em;
 }
 
 .style-selector:hover {
     background-color: @row_hover;
+    color: @theme_text;
 }
 
 /* Floating overlay controls over the map */
@@ -60,12 +62,13 @@ window.maps-window {
 }
 
 .map-control-btn {
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 32px;
+    min-height: 32px;
     border-radius: 6px;
     background-color: @theme_surface;
     border: 1px solid @hairline;
     color: @theme_text;
+    font-weight: 600;
     box-shadow: 0 2px 6px @theme_shadow;
 }
 
@@ -83,23 +86,24 @@ window.maps-window {
 .context-panel {
     background-color: @theme_bg;
     border-right: 1px solid @hairline;
-    min-width: 340px;
+    min-width: 320px;
 }
 
 .panel-header {
     min-height: 46px;
-    padding: 0 16px;
+    padding: 0 14px;
     border-bottom: 1px solid @hairline;
 }
 
 .panel-title {
     font-weight: 600;
-    font-size: 1em;
-    color: @theme_text;
+    font-size: 0.9em;
+    color: @theme_dim_text;
+    letter-spacing: 1px;
 }
 
 .panel-body {
-    padding: 14px 16px;
+    padding: 12px 14px;
 }
 
 /* Search Results List */
@@ -153,11 +157,12 @@ window.maps-window {
 
 .travel-mode-btn {
     min-height: 30px;
-    padding: 0 10px;
+    padding: 0 8px;
     border-radius: 6px;
     border: 1px solid @hairline;
     background: transparent;
     color: @theme_dim_text;
+    font-size: 0.88em;
 }
 
 .travel-mode-btn:hover {
@@ -167,9 +172,17 @@ window.maps-window {
 
 .travel-mode-btn.active {
     background-color: @nav_active;
-    color: @theme_text;
+    color: @theme_accent;
     border-color: @theme_accent;
     font-weight: 600;
+}
+
+.travel-mode-btn image {
+    color: @theme_dim_text;
+}
+
+.travel-mode-btn.active image {
+    color: @theme_accent;
 }
 
 .route-summary-card {
@@ -221,8 +234,8 @@ window.maps-window {
 .place-card {
     border: 1px solid @hairline;
     border-radius: 10px;
-    padding: 16px;
-    margin: 10px 0;
+    padding: 14px;
+    margin: 6px 0;
     background-color: @lift;
 }
 
@@ -255,4 +268,11 @@ window.maps-window {
 
 .bar-button:active {
     background-color: @nav_active;
+}
+
+.group-list {
+    background: transparent;
+    border: 1px solid @hairline;
+    border-radius: 10px;
+    padding: 2px 0;
 }

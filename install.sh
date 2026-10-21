@@ -14,19 +14,20 @@ install -Dm755 "$binary" "$HOME/.local/bin/nixe-maps"
 install -Dm644 "$root/data/io.github.design_nexus.nixe.Maps.desktop" "$share/applications/io.github.design_nexus.nixe.Maps.desktop"
 install -Dm644 "$root/data/icons/io.github.design_nexus.nixe.Maps.svg" "$share/icons/hicolor/scalable/apps/io.github.design_nexus.nixe.Maps.svg"
 
+# Install custom action icons
+mkdir -p "$share/icons/hicolor/scalable/actions"
+for icon in "$root/data/icons/"*-symbolic.svg; do
+  if [[ -f "$icon" ]]; then
+    install -m644 "$icon" "$share/icons/hicolor/scalable/actions/"
+  fi
+done
+
 if command -v update-desktop-database >/dev/null; then
   update-desktop-database "$share/applications" || true
 fi
 
-# Hyprland window rule
-hypr="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
-if [[ -d $hypr && -f $hypr/nixe.lua ]]; then
-  if ! grep -q 'nixe\.Maps' "$hypr/nixe.lua"; then
-    printf 'o.window("^io\\\\.github\\\\.design_nexus\\\\.nixe\\\\.Maps$", { float = true, center = true })\n' >> "$hypr/nixe.lua"
-    if command -v hyprctl >/dev/null 2>&1; then
-      hyprctl reload >/dev/null 2>&1 || true
-    fi
-  fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+  gtk-update-icon-cache -q -t "$share/icons/hicolor" || true
 fi
 
 printf 'Installed Nixe Maps without opening it.\n'

@@ -41,6 +41,7 @@ impl DirectionsPanel {
     ) -> Self {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 10);
         root.add_css_class("panel-body");
+        root.set_hexpand(false);
 
         // Header
         let header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -57,15 +58,25 @@ impl DirectionsPanel {
 
         // Travel mode switcher
         let mode_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-        let mode_drive = gtk::Button::with_label("Drive");
-        mode_drive.add_css_class("travel-mode-btn");
+        let make_mode_btn = |icon: &str, label: &str| -> gtk::Button {
+            let btn = gtk::Button::new();
+            btn.add_css_class("travel-mode-btn");
+            btn.set_hexpand(true);
+            let h = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            h.set_halign(gtk::Align::Center);
+            let img = gtk::Image::from_icon_name(icon);
+            img.set_pixel_size(14);
+            h.append(&img);
+            let lbl = gtk::Label::new(Some(label));
+            h.append(&lbl);
+            btn.set_child(Some(&h));
+            btn
+        };
+
+        let mode_drive = make_mode_btn("drive-symbolic", "Drive");
         mode_drive.add_css_class("active");
-
-        let mode_walk = gtk::Button::with_label("Walk");
-        mode_walk.add_css_class("travel-mode-btn");
-
-        let mode_cycle = gtk::Button::with_label("Cycle");
-        mode_cycle.add_css_class("travel-mode-btn");
+        let mode_walk = make_mode_btn("walk-symbolic", "Walk");
+        let mode_cycle = make_mode_btn("bicycle-symbolic", "Cycle");
 
         mode_box.append(&mode_drive);
         mode_box.append(&mode_walk);
@@ -130,10 +141,12 @@ impl DirectionsPanel {
 
         // Step-by-step maneuvers list
         let steps_scroller = gtk::ScrolledWindow::new();
+        steps_scroller.set_hexpand(false);
         steps_scroller.set_vexpand(true);
         steps_scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
 
         let steps_list = gtk::ListBox::new();
+        steps_list.set_hexpand(false);
         steps_list.add_css_class("group-list");
         steps_scroller.set_child(Some(&steps_list));
         root.append(&steps_scroller);

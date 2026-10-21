@@ -22,6 +22,8 @@ impl SearchBar {
 
         let entry = gtk::Entry::new();
         entry.set_placeholder_text(Some("Search places, addresses, or coordinates (lat, lon)..."));
+        entry.set_icon_from_icon_name(gtk::EntryIconPosition::Primary, Some("system-search-symbolic"));
+        entry.set_icon_activatable(gtk::EntryIconPosition::Primary, false);
         entry.add_css_class("maps-search-entry");
         entry.set_hexpand(true);
         root.append(&entry);
