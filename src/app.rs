@@ -42,7 +42,9 @@ impl MapsApp {
     }
 
     pub fn run(&self) -> glib::ExitCode {
-        theme::install();
+        self.app.connect_startup(|_| {
+            theme::install();
+        });
 
         let win_ref = self.main_window.clone();
         let cmd_rx_cell = self.cmd_receiver.clone();
