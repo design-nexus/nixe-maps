@@ -7,6 +7,7 @@ use nixe_ui::widgets;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct DirectionsPanel {
     pub root: gtk::Box,
     pub origin_entry: gtk::Entry,
@@ -41,6 +42,7 @@ impl DirectionsPanel {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 10);
         root.add_css_class("panel-body");
         root.set_hexpand(false);
+        root.set_size_request(320, -1);
 
         // Travel mode switcher
         let mode_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
@@ -81,11 +83,13 @@ impl DirectionsPanel {
         let origin_entry = gtk::Entry::new();
         origin_entry.set_placeholder_text(Some("Starting point (or 'My Location')"));
         origin_entry.add_css_class("waypoint-entry");
+        origin_entry.set_width_chars(18);
         fields_vbox.append(&origin_entry);
 
         let dest_entry = gtk::Entry::new();
         dest_entry.set_placeholder_text(Some("Destination"));
         dest_entry.add_css_class("waypoint-entry");
+        dest_entry.set_width_chars(18);
         fields_vbox.append(&dest_entry);
 
         inputs_box.append(&fields_vbox);
@@ -106,6 +110,10 @@ impl DirectionsPanel {
         let status_label = gtk::Label::new(None);
         status_label.add_css_class("dim");
         status_label.set_visible(false);
+        status_label.set_wrap(true);
+        status_label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        status_label.set_natural_wrap_mode(gtk::NaturalWrapMode::None);
+        status_label.set_max_width_chars(28);
         root.append(&status_label);
 
         // Summary Card
@@ -116,10 +124,12 @@ impl DirectionsPanel {
         let stats_row = gtk::Box::new(gtk::Orientation::Horizontal, 16);
         let time_label = gtk::Label::new(None);
         time_label.add_css_class("route-stat-value");
+        time_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         stats_row.append(&time_label);
 
         let dist_label = gtk::Label::new(None);
         dist_label.add_css_class("route-stat-label");
+        dist_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         stats_row.append(&dist_label);
         summary_box.append(&stats_row);
 
@@ -129,6 +139,7 @@ impl DirectionsPanel {
         let steps_scroller = gtk::ScrolledWindow::new();
         steps_scroller.set_hexpand(false);
         steps_scroller.set_vexpand(true);
+        steps_scroller.set_propagate_natural_width(false);
         steps_scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
 
         let steps_list = gtk::ListBox::new();
@@ -262,36 +273,14 @@ impl DirectionsPanel {
                     btn_c.set_sensitive(true);
                     match result {
                         Ok(route) => {
-                            st_lbl_c.set_visible(false);
-                            s_box_c.set_visible(true);
-
-                            let units = settings::get().units;
-                            d_lbl_c.set_text(&format_distance(route.distance_meters, &units));
-                            t_lbl_c.set_text(&format_duration(route.duration_seconds));
-
-                            // Populate steps
-                            while let Some(child) = st_list_c.first_child() {
-                                st_list_c.remove(&child);
-                            }
-
-                            for step in &route.steps {
-                                let row = gtk::Box::new(gtk::Orientation::Vertical, 2);
-                                row.add_css_class("step-row");
-
-                                let instr = gtk::Label::new(Some(&step.instruction));
-                                instr.add_css_class("step-text");
-                                instr.set_xalign(0.0);
-                                instr.set_wrap(true);
-                                row.append(&instr);
-
-                                let dist = gtk::Label::new(Some(&format_distance(step.distance_meters, &units)));
-                                dist.add_css_class("step-distance");
-                                dist.set_xalign(0.0);
-                                row.append(&dist);
-
-                                st_list_c.append(&row);
-                            }
-
+                            populate_route(
+                                &s_box_c,
+                                &d_lbl_c,
+                                &t_lbl_c,
+                                &st_list_c,
+                                &st_lbl_c,
+                                &route,
+                            );
                             on_calc_inner(route);
                         }
                         Err(e) => {
@@ -330,6 +319,61 @@ impl DirectionsPanel {
     pub fn set_destination(&self, lat: f64, lon: f64, text: &str) {
         *self.current_dest.borrow_mut() = Some((lat, lon));
         self.dest_entry.set_text(text);
+    }
+
+    pub fn display_route(&self, route: &RouteResult) {
+        populate_route(
+            &self.summary_box,
+            &self.dist_label,
+            &self.time_label,
+            &self.steps_list,
+            &self.status_label,
+            route,
+        );
+    }
+}
+
+fn populate_route(
+    summary_box: &gtk::Box,
+    dist_label: &gtk::Label,
+    time_label: &gtk::Label,
+    steps_list: &gtk::ListBox,
+    status_label: &gtk::Label,
+    route: &RouteResult,
+) {
+    status_label.set_visible(false);
+    summary_box.set_visible(true);
+
+    let units = settings::get().units;
+    dist_label.set_text(&format_distance(route.distance_meters, &units));
+    time_label.set_text(&format_duration(route.duration_seconds));
+
+    while let Some(child) = steps_list.first_child() {
+        steps_list.remove(&child);
+    }
+
+    for step in &route.steps {
+        let row = gtk::Box::new(gtk::Orientation::Vertical, 2);
+        row.add_css_class("step-row");
+
+        let instr = gtk::Label::new(Some(&step.instruction));
+        instr.add_css_class("step-text");
+        instr.set_xalign(0.0);
+        instr.set_wrap(true);
+        instr.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        instr.set_natural_wrap_mode(gtk::NaturalWrapMode::None);
+        instr.set_max_width_chars(28);
+        row.append(&instr);
+
+        let dist = gtk::Label::new(Some(&format_distance(step.distance_meters, &units)));
+        dist.add_css_class("step-distance");
+        dist.set_xalign(0.0);
+        dist.set_wrap(true);
+        dist.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        dist.set_natural_wrap_mode(gtk::NaturalWrapMode::None);
+        row.append(&dist);
+
+        steps_list.append(&row);
     }
 }
 

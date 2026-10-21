@@ -25,6 +25,7 @@ impl PlaceCard {
         root.add_css_class("place-card");
         root.add_css_class("panel-body");
         root.set_hexpand(false);
+        root.set_size_request(320, -1);
 
         // Header with Back button and Title
         let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -37,6 +38,7 @@ impl PlaceCard {
         title_label.set_hexpand(true);
         title_label.set_xalign(0.0);
         title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        title_label.set_max_width_chars(24);
         header.append(&title_label);
         root.append(&header);
 
@@ -44,6 +46,7 @@ impl PlaceCard {
         let category_label = gtk::Label::new(None);
         category_label.add_css_class("place-desc");
         category_label.set_xalign(0.0);
+        category_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         root.append(&category_label);
 
         // Address
@@ -51,12 +54,16 @@ impl PlaceCard {
         address_label.add_css_class("place-desc");
         address_label.set_xalign(0.0);
         address_label.set_wrap(true);
+        address_label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        address_label.set_natural_wrap_mode(gtk::NaturalWrapMode::None);
+        address_label.set_max_width_chars(28);
         root.append(&address_label);
 
         // Coordinates
         let coords_label = gtk::Label::new(None);
         coords_label.add_css_class("dim");
         coords_label.set_xalign(0.0);
+        coords_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         root.append(&coords_label);
 
         // Actions row
@@ -174,15 +181,18 @@ impl PlacesHubView {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
         root.set_hexpand(false);
         root.set_vexpand(true);
+        root.set_size_request(320, -1);
 
         let scroller = gtk::ScrolledWindow::new();
         scroller.set_hexpand(false);
         scroller.set_vexpand(true);
+        scroller.set_propagate_natural_width(false);
         scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
 
         let content = gtk::Box::new(gtk::Orientation::Vertical, 14);
         content.add_css_class("panel-body");
         content.set_hexpand(false);
+        content.set_size_request(320, -1);
 
         // --- 1. QUICK WAYPOINT CHIPS ---
         let chips_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -399,12 +409,14 @@ impl PlacesHubView {
                 name_lbl.add_css_class("place-title");
                 name_lbl.set_xalign(0.0);
                 name_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                name_lbl.set_max_width_chars(22);
                 info_box.append(&name_lbl);
 
                 let addr_lbl = gtk::Label::new(Some(&place.address));
                 addr_lbl.add_css_class("place-desc");
                 addr_lbl.set_xalign(0.0);
                 addr_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                addr_lbl.set_max_width_chars(24);
                 info_box.append(&addr_lbl);
 
                 row.append(&info_box);
@@ -473,12 +485,14 @@ impl PlacesHubView {
                 name_lbl.add_css_class("place-title");
                 name_lbl.set_xalign(0.0);
                 name_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                name_lbl.set_max_width_chars(22);
                 info_box.append(&name_lbl);
 
                 let addr_lbl = gtk::Label::new(Some(&rec.formatted_address));
                 addr_lbl.add_css_class("place-desc");
                 addr_lbl.set_xalign(0.0);
                 addr_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                addr_lbl.set_max_width_chars(24);
                 info_box.append(&addr_lbl);
 
                 row.append(&info_box);

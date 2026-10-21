@@ -148,6 +148,7 @@ impl MainWindow {
         panel_stack.set_transition_type(gtk::StackTransitionType::Crossfade);
         panel_stack.set_hexpand(false);
         panel_stack.set_vexpand(true);
+        panel_stack.set_size_request(320, -1);
         side_panel.append(&panel_stack);
 
         body_hbox.append(&side_panel);
@@ -742,8 +743,10 @@ impl MainWindow {
             let _ = sender.send(res).await;
         });
 
+        let dp = self.directions_panel.clone();
         glib::spawn_future_local(async move {
             if let Ok(Ok(route)) = receiver.recv().await {
+                dp.display_route(&route);
                 mv.show_route(&route.coordinates);
                 mv.center_on(start.0, start.1, None);
             }
