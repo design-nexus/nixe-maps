@@ -122,7 +122,7 @@ impl MainWindow {
         side_panel.set_size_request(320, -1);
         side_panel.set_visible(false);
 
-        // Sidebar Header: Segmented Switcher [ Places | Directions ] + Close
+        // Sidebar Header: Segmented Switcher [ Places | Directions ]
         let panel_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         panel_header.add_css_class("panel-header");
 
@@ -142,9 +142,6 @@ impl MainWindow {
         seg_box.append(&btn_seg_places);
         seg_box.append(&btn_seg_route);
         panel_header.append(&seg_box);
-
-        let panel_close = widgets::bar_button("window-close-symbolic", "Collapse sidebar (Ctrl+B)");
-        panel_header.append(&panel_close);
         side_panel.append(&panel_header);
 
         let panel_stack = gtk::Stack::new();
@@ -248,10 +245,6 @@ impl MainWindow {
         // --- CONSTRUCT SUB-PANELS ---
         // 1. Directions Panel
         let mv_dir = map_view.clone();
-        let sp_dir = side_panel.clone();
-        let ps_dir = panel_stack.clone();
-        let bp_dir = btn_seg_places.clone();
-        let br_dir = btn_seg_route.clone();
         let directions_panel = Rc::new(DirectionsPanel::new(
             database.clone(),
             move |route| {
@@ -260,31 +253,11 @@ impl MainWindow {
                     mv_dir.center_on(first.0, first.1, None);
                 }
             },
-            {
-                let ps = ps_dir.clone();
-                let bp = bp_dir.clone();
-                let br = br_dir.clone();
-                move || {
-                    ps.set_visible_child_name("hub");
-                    br.remove_css_class("active");
-                    bp.add_css_class("active");
-                }
-            },
-            {
-                let sp = sp_dir.clone();
-                let mv = map_view.clone();
-                move || {
-                    sp.set_visible(false);
-                    mv.clear_route();
-                }
-            },
         ));
-        panel_stack.add_named(&directions_panel.root, Some("directions"));
 
         // 2. Place Card
         let dp_c = directions_panel.clone();
         let pstack_c = panel_stack.clone();
-        let mv_pc = map_view.clone();
         let bp_pc = btn_seg_places.clone();
         let br_pc = btn_seg_route.clone();
         let place_card = Rc::new(PlaceCard::new(
@@ -311,20 +284,7 @@ impl MainWindow {
                     br.add_css_class("active");
                 }
             },
-            {
-                let mv = mv_pc.clone();
-                let ps = pstack_c.clone();
-                let bp = bp_pc.clone();
-                let br = br_pc.clone();
-                move || {
-                    mv.clear_selected_marker();
-                    ps.set_visible_child_name("hub");
-                    br.remove_css_class("active");
-                    bp.add_css_class("active");
-                }
-            },
         ));
-        panel_stack.add_named(&place_card.root, Some("place"));
 
         // 3. Places Hub
         let mv_hub = map_view.clone();
@@ -394,7 +354,12 @@ impl MainWindow {
             },
             toast_fn,
         ));
+
+        // Add sub-panels to stack: Hub first (default), then Place Details, then Directions
         panel_stack.add_named(&places_hub_view.root, Some("hub"));
+        panel_stack.add_named(&place_card.root, Some("place"));
+        panel_stack.add_named(&directions_panel.root, Some("directions"));
+        panel_stack.set_visible_child_name("hub");
 
         // 4. Search Bar
         let mv_search = map_view.clone();
@@ -438,11 +403,6 @@ impl MainWindow {
             ps_s2.set_visible_child_name("directions");
             bp_s2.remove_css_class("active");
             br_s2.add_css_class("active");
-        });
-
-        let sp_close = side_panel.clone();
-        panel_close.connect_clicked(move |_| {
-            sp_close.set_visible(false);
         });
 
         let main_win = Rc::new(Self {
@@ -500,7 +460,7 @@ impl MainWindow {
                 sp_clone.set_visible(false);
             } else {
                 hub_clone.refresh();
-                if pstack_clone.visible_child_name().is_none() {
+                if pstack_clone.visible_child_name().as_deref() != Some("place") {
                     pstack_clone.set_visible_child_name("hub");
                     br_clone.remove_css_class("active");
                     bp_clone.add_css_class("active");
@@ -577,7 +537,7 @@ impl MainWindow {
                     self_keys.side_panel.set_visible(false);
                 } else {
                     self_keys.places_hub_view.refresh();
-                    if self_keys.panel_stack.visible_child_name().is_none() {
+                    if self_keys.panel_stack.visible_child_name().as_deref() != Some("place") {
                         self_keys.panel_stack.set_visible_child_name("hub");
                         self_keys.set_active_segment("places");
                     }

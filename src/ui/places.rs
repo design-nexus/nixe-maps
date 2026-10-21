@@ -20,16 +20,15 @@ impl PlaceCard {
         db: Database,
         on_back: impl Fn() + 'static,
         on_directions: impl Fn(SearchResult) + 'static,
-        on_close: impl Fn() + 'static,
     ) -> Self {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
         root.add_css_class("place-card");
         root.add_css_class("panel-body");
         root.set_hexpand(false);
 
-        // Header with Back button, Title, and Close button
+        // Header with Back button and Title
         let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        let back_btn = widgets::bar_button("go-previous-symbolic", "Back to explore");
+        let back_btn = widgets::bar_button("go-previous-symbolic", "Back to places");
         back_btn.connect_clicked(move |_| on_back());
         header.append(&back_btn);
 
@@ -39,10 +38,6 @@ impl PlaceCard {
         title_label.set_xalign(0.0);
         title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         header.append(&title_label);
-
-        let close_btn = widgets::bar_button("window-close-symbolic", "Close");
-        close_btn.connect_clicked(move |_| on_close());
-        header.append(&close_btn);
         root.append(&header);
 
         // Category tag
