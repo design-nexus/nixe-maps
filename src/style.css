@@ -191,6 +191,30 @@ window.maps-window button.map-control-btn:active {
     color: @theme_text;
 }
 
+.nearby-chip-icon {
+    min-height: 32px;
+    min-width: 32px;
+    padding: 0;
+    border-radius: 6px;
+    border: 1px solid @hairline;
+    background: transparent;
+    color: @theme_dim_text;
+}
+
+.nearby-chip-icon:hover {
+    background-color: @row_hover;
+    color: @theme_text;
+    border-color: @theme_accent;
+}
+
+.nearby-chip-icon image {
+    color: @theme_dim_text;
+}
+
+.nearby-chip-icon:hover image {
+    color: @theme_accent;
+}
+
 .group-action-btn {
     font-size: 0.78em;
     padding: 0 4px;

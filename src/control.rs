@@ -59,6 +59,20 @@ pub fn tools() -> Value {
                 },
                 "required": ["start", "end"]
             }
+        },
+        {
+            "name": "maps.nearby",
+            "description": "Find places of a specific category (food, groceries, fuel, entertainment, parks) near coordinates or map center.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "category": { "type": "string", "enum": ["food", "groceries", "fuel", "entertainment", "parks"] },
+                    "lat": { "type": "number" },
+                    "lon": { "type": "number" },
+                    "radius_km": { "type": "number" }
+                },
+                "required": ["category"]
+            }
         }
     ])
 }
@@ -74,6 +88,26 @@ where
     });
     glib::spawn_future_local(async move {
         if let Ok(res) = rx.recv().await {
+            reply(res);
+        }
+    });
+}
+
+fn respond_async_gui<F, G>(reply: Reply, f: F, on_gui: G)
+where
+    F: std::future::Future<Output = Result<Value, String>> + Send + 'static,
+    G: FnOnce(&Value) + 'static,
+{
+    let (tx, rx) = async_channel::bounded::<Result<Value, String>>(1);
+    crate::runtime::spawn(async move {
+        let res = f.await;
+        let _ = tx.send(res).await;
+    });
+    glib::spawn_future_local(async move {
+        if let Ok(res) = rx.recv().await {
+            if let Ok(ref val) = res {
+                on_gui(val);
+            }
             reply(res);
         }
     });
@@ -156,6 +190,49 @@ pub fn handle(name: &str, args: Value, win_ref: Rc<RefCell<Option<Rc<MainWindow>
             } else {
                 reply(Err("Maps window not open".into()));
             }
+        }
+        "maps.nearby" => {
+            let category = match args["category"].as_str() {
+                Some(c) => c.to_string(),
+                None => return reply(Err("category is required".into())),
+            };
+            let (lat, lon) = if let (Some(la), Some(lo)) = (args["lat"].as_f64(), args["lon"].as_f64()) {
+                (la, lo)
+            } else if let Some(ref win) = *win_ref.borrow() {
+                let (la, lo, _) = win.map_view.get_viewport_state();
+                if la == 0.0 && lo == 0.0 { (33.1207, -86.7601) } else { (la, lo) }
+            } else {
+                (33.1207, -86.7601)
+            };
+            let radius_km = args["radius_km"].as_f64().unwrap_or(8.0);
+            let cat_query = category.clone();
+
+            let win_opt = win_ref.clone();
+            respond_async_gui(
+                reply,
+                async move {
+                    match crate::providers::search_nearby(&cat_query, lat, lon, radius_km, &api_key).await {
+                        Ok(places) => Ok(json!(places)),
+                        Err(e) => Err(e.to_string()),
+                    }
+                },
+                move |val| {
+                    if let Ok(places) = serde_json::from_value::<Vec<crate::providers::SearchResult>>(val.clone()) {
+                        let cat_label = match category.as_str() {
+                            "food" => "Food nearby",
+                            "groceries" => "Groceries nearby",
+                            "fuel" => "Fuel nearby",
+                            "entertainment" => "Entertainment nearby",
+                            "parks" => "Parks nearby",
+                            _ => "Places nearby",
+                        };
+                        if let Some(ref win) = *win_opt.borrow() {
+                            win.search_bar.show_results(cat_label, places);
+                            win.window.present();
+                        }
+                    }
+                },
+            );
         }
         _ => reply(Err(format!("unknown tool {name}"))),
     }

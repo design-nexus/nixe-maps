@@ -20,10 +20,10 @@ use std::time::Duration;
 pub struct MainWindow {
     pub window: gtk::ApplicationWindow,
     pub overlay: gtk::Overlay,
-    map_view: MapView,
+    pub map_view: MapView,
     side_panel: gtk::Box,
     panel_stack: gtk::Stack,
-    search_bar: Rc<SearchBar>,
+    pub search_bar: Rc<SearchBar>,
     directions_panel: Rc<DirectionsPanel>,
     place_card: Rc<PlaceCard>,
     places_hub_view: Rc<PlacesHubView>,
@@ -345,11 +345,53 @@ impl MainWindow {
             },
             {
                 let sbc = sbc_clone.clone();
-                move |query| {
-                    if let Some(ref sb) = *sbc.borrow() {
-                        sb.set_text(query);
-                        sb.focus();
-                    }
+                let mv_cat = map_view.clone();
+                let toast_c = toast_fn.clone();
+                move |category: &str| {
+                    let cat = category.to_string();
+                    let (lat, lon, _) = mv_cat.get_viewport_state();
+                    let (lat, lon) = if lat == 0.0 && lon == 0.0 {
+                        (33.1207, -86.7601)
+                    } else {
+                        (lat, lon)
+                    };
+
+                    let cat_label = match cat.as_str() {
+                        "food" => "Food nearby",
+                        "groceries" => "Groceries nearby",
+                        "fuel" => "Fuel nearby",
+                        "entertainment" => "Entertainment nearby",
+                        "parks" => "Parks nearby",
+                        _ => "Places nearby",
+                    };
+
+                    let toast_cat = toast_c.clone();
+                    let sbc_inner = sbc.clone();
+                    let api_key = settings::get().geoapify_api_key;
+                    let (sender, receiver) = async_channel::bounded(1);
+
+                    crate::runtime::spawn(async move {
+                        let res = crate::providers::search_nearby(&cat, lat, lon, 8.0, &api_key).await;
+                        let _ = sender.send((cat, res)).await;
+                    });
+
+                    glib::spawn_future_local(async move {
+                        if let Ok((c, res)) = receiver.recv().await {
+                            match res {
+                                Ok(places) if !places.is_empty() => {
+                                    if let Some(ref sb) = *sbc_inner.borrow() {
+                                        sb.show_results(cat_label, places);
+                                    }
+                                }
+                                Ok(_) => {
+                                    toast_cat(&format!("No {} found nearby", c));
+                                }
+                                Err(e) => {
+                                    toast_cat(&format!("Nearby search failed: {}", e));
+                                }
+                            }
+                        }
+                    });
                 }
             },
             toast_fn,

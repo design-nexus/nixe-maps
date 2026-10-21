@@ -216,7 +216,42 @@ impl PlacesHubView {
         chips_box.append(&btn_route_chip);
         content.append(&chips_box);
 
-        // --- 2. SAVED PLACES SECTION ---
+        // --- 2. EXPLORE NEARBY CATEGORIES ---
+        let nearby_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let nearby_title = gtk::Label::new(Some("EXPLORE NEARBY"));
+        nearby_title.add_css_class("panel-section-title");
+        nearby_title.set_hexpand(true);
+        nearby_title.set_xalign(0.0);
+        nearby_header.append(&nearby_title);
+        content.append(&nearby_header);
+
+        let nearby_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        nearby_box.add_css_class("nearby-chips");
+        nearby_box.set_homogeneous(true);
+        let on_cat = Rc::new(on_category_search);
+        let categories = [
+            ("emoji-food-symbolic", "Food", "food"),
+            ("emoji-objects-symbolic", "Groceries", "groceries"),
+            ("emoji-travel-symbolic", "Fuel", "fuel"),
+            ("applications-multimedia-symbolic", "Entertainment", "entertainment"),
+            ("emoji-nature-symbolic", "Parks", "parks"),
+        ];
+
+        for (icon_name, tooltip, category) in categories {
+            let cat_btn = gtk::Button::new();
+            let icon = gtk::Image::from_icon_name(icon_name);
+            icon.set_pixel_size(16);
+            cat_btn.set_child(Some(&icon));
+            cat_btn.set_tooltip_text(Some(tooltip));
+            cat_btn.add_css_class("nearby-chip-icon");
+            let c_query = category.to_string();
+            let c_cb = on_cat.clone();
+            cat_btn.connect_clicked(move |_| c_cb(&c_query));
+            nearby_box.append(&cat_btn);
+        }
+        content.append(&nearby_box);
+
+        // --- 3. SAVED PLACES SECTION ---
         let saved_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let saved_title = gtk::Label::new(Some("SAVED PLACES"));
         saved_title.add_css_class("panel-section-title");
@@ -229,7 +264,7 @@ impl PlacesHubView {
         saved_list.add_css_class("group-list");
         content.append(&saved_list);
 
-        // --- 3. RECENT SEARCHES SECTION ---
+        // --- 4. RECENT SEARCHES SECTION ---
         let recents_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let recents_title = gtk::Label::new(Some("RECENT SEARCHES"));
         recents_title.add_css_class("panel-section-title");
@@ -246,40 +281,6 @@ impl PlacesHubView {
         let recents_list = gtk::ListBox::new();
         recents_list.add_css_class("group-list");
         content.append(&recents_list);
-
-        // --- 4. EXPLORE NEARBY CATEGORIES ---
-        let nearby_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        let nearby_title = gtk::Label::new(Some("EXPLORE NEARBY"));
-        nearby_title.add_css_class("panel-section-title");
-        nearby_title.set_hexpand(true);
-        nearby_title.set_xalign(0.0);
-        nearby_header.append(&nearby_title);
-        content.append(&nearby_header);
-
-        let nearby_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        nearby_box.add_css_class("nearby-chips");
-        let on_cat = Rc::new(on_category_search);
-        let categories = [
-            ("☕ Coffee", "coffee"),
-            ("🍽 Food", "restaurant"),
-            ("⛽ Fuel", "gas"),
-            ("🅿 Parking", "parking"),
-            ("🌲 Parks", "park"),
-        ];
-
-        for (label, query) in categories {
-            let cat_btn = gtk::Button::with_label(label);
-            cat_btn.add_css_class("nearby-chip");
-            let c_query = query.to_string();
-            let c_cb = on_cat.clone();
-            cat_btn.connect_clicked(move |_| c_cb(&c_query));
-            nearby_box.append(&cat_btn);
-        }
-
-        let nearby_scroll = gtk::ScrolledWindow::new();
-        nearby_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Never);
-        nearby_scroll.set_child(Some(&nearby_box));
-        content.append(&nearby_scroll);
 
         scroller.set_child(Some(&content));
         root.append(&scroller);

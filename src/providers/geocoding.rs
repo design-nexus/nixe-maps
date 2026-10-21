@@ -52,6 +52,27 @@ struct GeoapifyPlace {
     result_type: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct GeoapifyPlacesFeatureCollection {
+    features: Option<Vec<GeoapifyPlacesFeature>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeoapifyPlacesFeature {
+    properties: Option<GeoapifyPlaceProperties>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeoapifyPlaceProperties {
+    name: Option<String>,
+    formatted: Option<String>,
+    address_line1: Option<String>,
+    address_line2: Option<String>,
+    lat: Option<f64>,
+    lon: Option<f64>,
+    category: Option<String>,
+}
+
 // Nominatim Geocoding API response format (fallback)
 #[derive(Debug, Deserialize)]
 struct NominatimPlace {
@@ -138,15 +159,141 @@ pub async fn search_places(query: &str, api_key: &str) -> Result<Vec<SearchResul
             .filter_map(|p| {
                 let lat = p.lat.parse::<f64>().ok()?;
                 let lon = p.lon.parse::<f64>().ok()?;
-                let name = p.name.unwrap_or_else(|| {
-                    p.display_name.split(',').next().unwrap_or("Place").trim().to_string()
-                });
+                let name = p.name
+                    .filter(|n| !n.trim().is_empty())
+                    .unwrap_or_else(|| {
+                        p.display_name.split(',').next().unwrap_or("Place").trim().to_string()
+                    });
                 Some(SearchResult {
                     name,
                     formatted_address: p.display_name,
                     lat,
                     lon,
                     category: p.place_type,
+                })
+            })
+            .collect();
+        return Ok(results);
+    }
+
+    Ok(Vec::new())
+}
+
+pub async fn search_nearby(
+    category: &str,
+    lat: f64,
+    lon: f64,
+    radius_km: f64,
+    api_key: &str,
+) -> Result<Vec<SearchResult>> {
+    let client = reqwest::Client::builder()
+        .user_agent("nixe-maps/1.0 (https://github.com/design-nexus/nixe-maps)")
+        .build()?;
+
+    // 1. Geoapify Places API v2 if API key is provided
+    if !api_key.trim().is_empty() {
+        let geoapify_cat = match category {
+            "food" => "catering.restaurant,catering.fast_food",
+            "groceries" => "commercial.supermarket,commercial.food_and_drink",
+            "fuel" => "service.vehicle.fuel",
+            "entertainment" => "entertainment.culture,entertainment.cinema",
+            "parks" => "leisure.park",
+            other => other,
+        };
+
+        let radius_meters = (radius_km * 1000.0) as u32;
+        let url = format!(
+            "https://api.geoapify.com/v2/places?categories={}&filter=circle:{},{},{}&bias=proximity:{},{}&limit=10&apiKey={}",
+            geoapify_cat,
+            lon,
+            lat,
+            radius_meters,
+            lon,
+            lat,
+            api_key.trim()
+        );
+
+        if let Ok(resp) = client.get(&url).send().await {
+            if resp.status().is_success() {
+                if let Ok(data) = resp.json::<GeoapifyPlacesFeatureCollection>().await {
+                    if let Some(features) = data.features {
+                        let results: Vec<SearchResult> = features
+                            .into_iter()
+                            .filter_map(|f| {
+                                let p = f.properties?;
+                                let p_lat = p.lat?;
+                                let p_lon = p.lon?;
+                                let name = p.name
+                                    .or(p.address_line1)
+                                    .unwrap_or_else(|| "Place".to_string());
+                                let formatted = p.formatted
+                                    .or(p.address_line2)
+                                    .unwrap_or_else(|| name.clone());
+                                Some(SearchResult {
+                                    name,
+                                    formatted_address: formatted,
+                                    lat: p_lat,
+                                    lon: p_lon,
+                                    category: p.category.or_else(|| Some(category.to_string())),
+                                })
+                            })
+                            .collect();
+                        if !results.is_empty() {
+                            return Ok(results);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Nominatim Bounded Search Fallback
+    let (query, display_cat) = match category {
+        "food" => ("restaurant", "Restaurant"),
+        "groceries" => ("supermarket", "Groceries"),
+        "fuel" => ("fuel", "Gas Station"),
+        "entertainment" => ("cinema", "Entertainment"),
+        "parks" => ("park", "Park"),
+        other => (other, other),
+    };
+
+    let lat_delta = radius_km / 111.0;
+    let cos_lat = lat.to_radians().cos().abs().max(0.01);
+    let lon_delta = radius_km / (111.0 * cos_lat);
+
+    let min_lat = (lat - lat_delta).max(-90.0);
+    let max_lat = (lat + lat_delta).min(90.0);
+    let min_lon = (lon - lon_delta).max(-180.0);
+    let max_lon = (lon + lon_delta).min(180.0);
+
+    let url = format!(
+        "https://nominatim.openstreetmap.org/search?format=json&q={}&viewbox={:.6},{:.6},{:.6},{:.6}&bounded=1&limit=10",
+        urlencoding::encode(query),
+        min_lon,
+        max_lat,
+        max_lon,
+        min_lat
+    );
+
+    let resp = client.get(&url).send().await?;
+    if resp.status().is_success() {
+        let places: Vec<NominatimPlace> = resp.json().await?;
+        let results = places
+            .into_iter()
+            .filter_map(|p| {
+                let p_lat = p.lat.parse::<f64>().ok()?;
+                let p_lon = p.lon.parse::<f64>().ok()?;
+                let name = p.name
+                    .filter(|n| !n.trim().is_empty())
+                    .unwrap_or_else(|| {
+                        p.display_name.split(',').next().unwrap_or("Place").trim().to_string()
+                    });
+                Some(SearchResult {
+                    name,
+                    formatted_address: p.display_name,
+                    lat: p_lat,
+                    lon: p_lon,
+                    category: p.place_type.or_else(|| Some(display_cat.to_string())),
                 })
             })
             .collect();
@@ -184,5 +331,26 @@ mod tests {
         assert_eq!(parse_coordinates("   40.7128   -74.0060  "), Some((40.7128, -74.0060)));
         assert_eq!(parse_coordinates("100.0, 50.0"), None); // Invalid lat
         assert_eq!(parse_coordinates("Nashville"), None);
+    }
+
+    #[test]
+    fn test_search_nearby_bounding_box() {
+        let lat: f64 = 33.1207;
+        let lon: f64 = -86.7601;
+        let radius_km: f64 = 8.0;
+
+        let lat_delta: f64 = radius_km / 111.0;
+        let cos_lat: f64 = lat.to_radians().cos().abs().max(0.01);
+        let lon_delta: f64 = radius_km / (111.0 * cos_lat);
+
+        let min_lat: f64 = (lat - lat_delta).max(-90.0);
+        let max_lat: f64 = (lat + lat_delta).min(90.0);
+        let min_lon: f64 = (lon - lon_delta).max(-180.0);
+        let max_lon: f64 = (lon + lon_delta).min(180.0);
+
+        assert!(min_lat < lat && lat < max_lat);
+        assert!(min_lon < lon && lon < max_lon);
+        assert!((max_lat - min_lat) > 0.1);
+        assert!((max_lon - min_lon) > 0.1);
     }
 }

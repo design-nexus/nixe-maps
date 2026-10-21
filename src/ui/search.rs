@@ -13,7 +13,9 @@ pub struct SearchBar {
     popover: gtk::Popover,
     results_list: gtk::ListBox,
     current_search_id: Rc<RefCell<u64>>,
+    suppress_search: Rc<RefCell<bool>>,
     db: Database,
+    on_select: Rc<dyn Fn(SearchResult)>,
 }
 
 impl SearchBar {
@@ -46,7 +48,8 @@ impl SearchBar {
         popover.set_child(Some(&pop_box));
 
         let current_search_id = Rc::new(RefCell::new(0u64));
-        let on_select = Rc::new(on_select);
+        let suppress_search = Rc::new(RefCell::new(false));
+        let on_select: Rc<dyn Fn(SearchResult)> = Rc::new(on_select);
 
         let search_bar = Self {
             root,
@@ -54,22 +57,30 @@ impl SearchBar {
             popover,
             results_list,
             current_search_id,
+            suppress_search,
             db,
+            on_select,
         };
 
-        search_bar.setup_signals(on_select);
+        search_bar.setup_signals();
         search_bar
     }
 
-    fn setup_signals(&self, on_select: Rc<dyn Fn(SearchResult)>) {
+    fn setup_signals(&self) {
         let entry = self.entry.clone();
         let search_id = self.current_search_id.clone();
+        let suppress = self.suppress_search.clone();
         let popover = self.popover.clone();
         let results_list = self.results_list.clone();
-        let on_sel = on_select.clone();
+        let on_sel = self.on_select.clone();
         let db_c = self.db.clone();
 
         entry.connect_changed(move |e| {
+            if *suppress.borrow() {
+                *suppress.borrow_mut() = false;
+                return;
+            }
+
             let text = e.text().trim().to_string();
             if text.is_empty() {
                 popover.popdown();
@@ -137,6 +148,22 @@ impl SearchBar {
 
     pub fn set_text(&self, text: &str) {
         self.entry.set_text(text);
+    }
+
+    pub fn show_results(&self, query_label: &str, places: Vec<SearchResult>) {
+        *self.suppress_search.borrow_mut() = true;
+        self.entry.set_text(query_label);
+
+        // Invalidate any existing debounced timer
+        let mut id = self.current_search_id.borrow_mut();
+        *id += 1;
+
+        if !places.is_empty() {
+            populate_results(&self.results_list, &self.popover, places, self.on_select.clone(), &self.db);
+            self.popover.popup();
+        } else {
+            self.popover.popdown();
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::providers::{TravelMode, calculate_route, parse_coordinates, search_places};
+use crate::providers::{TravelMode, calculate_route, parse_coordinates, search_nearby, search_places};
 use crate::settings;
 use serde_json::json;
 
@@ -12,7 +12,7 @@ pub async fn handle_cli_api(args: &[String]) -> bool {
     }
 
     if args.len() < 2 {
-        eprintln!("{}", json!({ "error": "Missing API command. Use 'search', 'distance', or 'route'." }));
+        eprintln!("{}", json!({ "error": "Missing API command. Use 'search', 'nearby', 'distance', or 'route'." }));
         return true;
     }
 
@@ -33,6 +33,32 @@ pub async fn handle_cli_api(args: &[String]) -> bool {
                 Err(e) => {
                     println!("{}", json!({ "error": e.to_string() }));
                 }
+            }
+            true
+        }
+        "nearby" => {
+            if args.len() < 4 {
+                println!("{}", json!({ "error": "Usage: --api nearby <category> <lat,lon> [radius_km]" }));
+                return true;
+            }
+            let category = &args[2];
+            let coords = parse_coordinates(&args[3]);
+            let radius = if args.len() >= 5 {
+                args[4].parse::<f64>().unwrap_or(8.0)
+            } else {
+                8.0
+            };
+            if let Some((lat, lon)) = coords {
+                match search_nearby(category, lat, lon, radius, &api_key).await {
+                    Ok(results) => {
+                        println!("{}", serde_json::to_string_pretty(&results).unwrap());
+                    }
+                    Err(e) => {
+                        println!("{}", json!({ "error": e.to_string() }));
+                    }
+                }
+            } else {
+                println!("{}", json!({ "error": "Invalid coordinates" }));
             }
             true
         }
