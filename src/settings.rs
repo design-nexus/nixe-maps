@@ -39,6 +39,13 @@ pub struct Settings {
     pub last_zoom: f64,
 
     #[serde(default)]
+    pub last_current_lat: Option<f64>,
+    #[serde(default)]
+    pub last_current_lon: Option<f64>,
+    #[serde(default)]
+    pub last_current_label: Option<String>,
+
+    #[serde(default)]
     pub home_address: String,
     #[serde(default)]
     pub home_lat: Option<f64>,
@@ -88,6 +95,9 @@ impl Default for Settings {
             last_lat: default_lat(),
             last_lon: default_lon(),
             last_zoom: default_zoom(),
+            last_current_lat: None,
+            last_current_lon: None,
+            last_current_label: None,
             home_address: String::new(),
             home_lat: None,
             home_lon: None,

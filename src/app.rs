@@ -41,6 +41,7 @@ impl MapsApp {
             if win_ref.borrow().is_none() {
                 let win = MainWindow::build(application);
                 win.window.present();
+                win.check_location_on_startup();
                 *win_ref.borrow_mut() = Some(win);
             } else if let Some(ref win) = *win_ref.borrow() {
                 win.window.present();

@@ -12,6 +12,7 @@ pub struct DirectionsPanel {
     pub root: gtk::Box,
     pub origin_entry: gtk::Entry,
     pub dest_entry: gtk::Entry,
+    pub get_route_btn: gtk::Button,
     #[allow(dead_code)]
     mode_drive: gtk::Button,
     #[allow(dead_code)]
@@ -226,9 +227,34 @@ impl DirectionsPanel {
         let btn_clone = get_route_btn.clone();
         let db_c = db.clone();
 
+        let co_ch = current_origin.clone();
+        origin_entry.connect_changed(move |ent| {
+            let t = ent.text();
+            if t.is_empty() {
+                *co_ch.borrow_mut() = None;
+            }
+        });
+
+        let cd_ch = current_dest.clone();
+        dest_entry.connect_changed(move |ent| {
+            if ent.text().is_empty() {
+                *cd_ch.borrow_mut() = None;
+            }
+        });
+
         get_route_btn.connect_clicked(move |_| {
-            let o_str = o_e.text().trim().to_string();
+            let mut o_str = o_e.text().trim().to_string();
             let d_str = d_e.text().trim().to_string();
+
+            // Default to My Location if origin is blank
+            if o_str.is_empty() {
+                let s = settings::get();
+                if let (Some(lat), Some(lon)) = (s.last_current_lat, s.last_current_lon) {
+                    *co_c.borrow_mut() = Some((lat, lon));
+                    o_e.set_text("My Location");
+                    o_str = "My Location".to_string();
+                }
+            }
 
             if o_str.is_empty() || d_str.is_empty() {
                 st_lbl.set_text("Please enter both origin and destination.");
@@ -306,6 +332,7 @@ impl DirectionsPanel {
             root,
             origin_entry,
             dest_entry,
+            get_route_btn,
             mode_drive,
             mode_walk,
             mode_cycle,
@@ -328,6 +355,19 @@ impl DirectionsPanel {
     pub fn set_destination(&self, lat: f64, lon: f64, text: &str) {
         *self.current_dest.borrow_mut() = Some((lat, lon));
         self.dest_entry.set_text(text);
+    }
+
+    pub fn calculate_route(&self) {
+        self.get_route_btn.emit_clicked();
+    }
+
+    pub fn get_origin_coords(&self) -> Option<(f64, f64)> {
+        *self.current_origin.borrow()
+    }
+
+    #[allow(dead_code)]
+    pub fn get_dest_coords(&self) -> Option<(f64, f64)> {
+        *self.current_dest.borrow()
     }
 
     pub fn display_route(&self, route: &RouteResult) {
@@ -387,17 +427,42 @@ fn populate_route(
 }
 
 async fn resolve_point(text: &str, api_key: &str, db: &Database) -> Option<(f64, f64)> {
-    if text.eq_ignore_ascii_case("home") {
+    let trimmed = text.trim();
+    if trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case("my location")
+        || trimmed.eq_ignore_ascii_case("current location")
+        || trimmed.eq_ignore_ascii_case("here")
+        || trimmed.eq_ignore_ascii_case("me")
+    {
+        let s = settings::get();
+        if let (Some(lat), Some(lon)) = (s.last_current_lat, s.last_current_lon) {
+            return Some((lat, lon));
+        }
+        if let Ok(loc) = crate::location::request_current_location().await {
+            settings::update(|s| {
+                s.last_current_lat = Some(loc.latitude);
+                s.last_current_lon = Some(loc.longitude);
+                s.last_current_label = loc.label.clone();
+            });
+            return Some((loc.latitude, loc.longitude));
+        }
+    }
+
+    if let Some(coords) = crate::providers::parse_coordinates(trimmed) {
+        return Some(coords);
+    }
+
+    if trimmed.eq_ignore_ascii_case("home") {
         if let Ok(Some(p)) = db.get_favorite_by_label("home") {
             return Some((p.lat, p.lon));
         }
-    } else if text.eq_ignore_ascii_case("work") {
+    } else if trimmed.eq_ignore_ascii_case("work") {
         if let Ok(Some(p)) = db.get_favorite_by_label("work") {
             return Some((p.lat, p.lon));
         }
     }
 
-    if let Ok(results) = crate::providers::search_places(text, api_key).await {
+    if let Ok(results) = crate::providers::search_places(trimmed, api_key).await {
         if let Some(first) = results.into_iter().next() {
             return Some((first.lat, first.lon));
         }

@@ -12,6 +12,8 @@ pub struct MapView {
     route_layer: PathLayer,
     selected_marker: Rc<RefCell<Option<Marker>>>,
     user_marker: Rc<RefCell<Option<Marker>>>,
+    route_start_marker: Rc<RefCell<Option<Marker>>>,
+    route_end_marker: Rc<RefCell<Option<Marker>>>,
     current_style: Rc<RefCell<MapStyle>>,
 }
 
@@ -31,11 +33,13 @@ impl MapView {
 
         let marker_layer = MarkerLayer::new(&viewport);
         let route_layer = PathLayer::new(&viewport);
+        route_layer.set_stroke(true);
+        route_layer.set_closed(false);
 
         // Styling for route line
-        let route_color = gdk::RGBA::new(0.537, 0.706, 0.980, 0.9); // Catppuccin Blue / Accent
+        let route_color = gdk::RGBA::new(0.35, 0.60, 0.98, 0.95);
         route_layer.set_stroke_color(Some(&route_color));
-        route_layer.set_stroke_width(5.0);
+        route_layer.set_stroke_width(6.0);
 
         root.add_overlay_layer(&route_layer);
         root.add_overlay_layer(&marker_layer);
@@ -46,6 +50,8 @@ impl MapView {
             route_layer,
             selected_marker: Rc::new(RefCell::new(None)),
             user_marker: Rc::new(RefCell::new(None)),
+            route_start_marker: Rc::new(RefCell::new(None)),
+            route_end_marker: Rc::new(RefCell::new(None)),
             current_style: Rc::new(RefCell::new(style)),
         };
 
@@ -112,18 +118,103 @@ impl MapView {
         *self.user_marker.borrow_mut() = Some(marker);
     }
 
+    pub fn fit_coordinates(&self, coordinates: &[(f64, f64)]) {
+        if coordinates.is_empty() {
+            return;
+        }
+        let mut min_lat = f64::MAX;
+        let mut max_lat = f64::MIN;
+        let mut min_lon = f64::MAX;
+        let mut max_lon = f64::MIN;
+
+        for &(lat, lon) in coordinates {
+            if lat < min_lat { min_lat = lat; }
+            if lat > max_lat { max_lat = lat; }
+            if lon < min_lon { min_lon = lon; }
+            if lon > max_lon { max_lon = lon; }
+        }
+
+        let center_lat = (min_lat + max_lat) / 2.0;
+        let center_lon = (min_lon + max_lon) / 2.0;
+
+        let lat_diff = (max_lat - min_lat).abs();
+        let lon_diff = (max_lon - min_lon).abs();
+        let max_diff = lat_diff.max(lon_diff);
+
+        let zoom = if max_diff < 0.005 {
+            16.0
+        } else if max_diff < 0.015 {
+            15.0
+        } else if max_diff < 0.035 {
+            14.0
+        } else if max_diff < 0.08 {
+            13.0
+        } else if max_diff < 0.18 {
+            12.0
+        } else if max_diff < 0.4 {
+            11.0
+        } else if max_diff < 0.9 {
+            10.0
+        } else if max_diff < 2.0 {
+            9.0
+        } else if max_diff < 4.0 {
+            8.0
+        } else if max_diff < 8.0 {
+            7.0
+        } else {
+            6.0
+        };
+
+        self.center_on(center_lat, center_lon, Some(zoom));
+    }
+
     pub fn show_route(&self, coordinates: &[(f64, f64)]) {
         self.clear_route();
 
+        if coordinates.is_empty() {
+            return;
+        }
+
         for (lat, lon) in coordinates {
-            let coord = Coordinate::new();
-            coord.set_location(*lat, *lon);
+            let coord = Coordinate::new_full(*lat, *lon);
             self.route_layer.add_node(&coord);
         }
+
+        // Start marker (origin)
+        if let Some(first) = coordinates.first() {
+            let marker = Marker::new();
+            marker.set_location(first.0, first.1);
+            let icon = gtk::Image::from_icon_name("find-location-symbolic");
+            icon.set_pixel_size(22);
+            icon.add_css_class("map-pin-start");
+            marker.set_child(Some(&icon));
+            self.marker_layer.add_marker(&marker);
+            *self.route_start_marker.borrow_mut() = Some(marker);
+        }
+
+        // End marker (destination)
+        if let Some(last) = coordinates.last() {
+            let marker = Marker::new();
+            marker.set_location(last.0, last.1);
+            let icon = gtk::Image::from_icon_name("mark-location-symbolic");
+            icon.set_pixel_size(24);
+            icon.add_css_class("map-pin-accent");
+            marker.set_child(Some(&icon));
+            self.marker_layer.add_marker(&marker);
+            *self.route_end_marker.borrow_mut() = Some(marker);
+        }
+
+        self.fit_coordinates(coordinates);
     }
 
     pub fn clear_route(&self) {
         self.route_layer.remove_all();
+        if let Some(m) = self.route_start_marker.borrow_mut().take() {
+            self.marker_layer.remove_marker(&m);
+        }
+        if let Some(m) = self.route_end_marker.borrow_mut().take() {
+            self.marker_layer.remove_marker(&m);
+        }
     }
 
     pub fn zoom_in(&self) {

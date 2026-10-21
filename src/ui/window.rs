@@ -154,13 +154,19 @@ impl MainWindow {
 
         body_hbox.append(&side_panel);
 
+        let (start_lat, start_lon) = match (initial_settings.last_current_lat, initial_settings.last_current_lon) {
+            (Some(lat), Some(lon)) => (lat, lon),
+            _ => (initial_settings.last_lat, initial_settings.last_lon),
+        };
+
         // Map View
         let map_view = MapView::new(
-            initial_settings.last_lat,
-            initial_settings.last_lon,
+            start_lat,
+            start_lon,
             initial_settings.last_zoom,
             cur_style,
         );
+        map_view.set_user_location(start_lat, start_lon);
 
         // Map overlay container for floating controls
         let map_overlay = gtk::Overlay::new();
@@ -213,7 +219,7 @@ impl MainWindow {
         status_spacer.set_hexpand(true);
         statusbar.append(&status_spacer);
 
-        let coords_lbl = gtk::Label::new(Some(&format!("{:.4}, {:.4}", initial_settings.last_lat, initial_settings.last_lon)));
+        let coords_lbl = gtk::Label::new(Some(&format!("{:.4}, {:.4}", start_lat, start_lon)));
         coords_lbl.add_css_class("dim");
         statusbar.append(&coords_lbl);
 
@@ -251,11 +257,9 @@ impl MainWindow {
             database.clone(),
             move |route| {
                 mv_dir.show_route(&route.coordinates);
-                if let Some(first) = route.coordinates.first() {
-                    mv_dir.center_on(first.0, first.1, None);
-                }
             },
         ));
+        directions_panel.set_origin(start_lat, start_lon, "My Location");
 
         // 2. Place Card
         let dp_c = directions_panel.clone();
@@ -281,9 +285,16 @@ impl MainWindow {
                 let br = br_pc.clone();
                 move |place| {
                     dp.set_destination(place.lat, place.lon, &place.name);
+                    if dp.get_origin_coords().is_none() {
+                        let s = settings::get();
+                        if let (Some(lat), Some(lon)) = (s.last_current_lat, s.last_current_lon) {
+                            dp.set_origin(lat, lon, "My Location");
+                        }
+                    }
                     ps.set_visible_child_name("directions");
                     bp.remove_css_class("active");
                     br.add_css_class("active");
+                    dp.calculate_route();
                 }
             },
         ));
@@ -676,9 +687,17 @@ impl MainWindow {
             if let Ok(res) = receiver.recv().await {
                 match res {
                     Ok(loc) => {
+                        let name = loc.label.unwrap_or_else(|| "Current Location".to_string());
+                        settings::update(|s| {
+                            s.last_current_lat = Some(loc.latitude);
+                            s.last_current_lon = Some(loc.longitude);
+                            s.last_current_label = Some(name.clone());
+                            s.last_lat = loc.latitude;
+                            s.last_lon = loc.longitude;
+                        });
+
                         self_c.map_view.center_on(loc.latitude, loc.longitude, Some(14.0));
                         self_c.map_view.set_user_location(loc.latitude, loc.longitude);
-                        let name = loc.label.unwrap_or_else(|| "Current Location".to_string());
                         self_c.show_toast(&format!("Located: {} (±{:.0}m)", name, loc.accuracy));
                         self_c.directions_panel.set_origin(loc.latitude, loc.longitude, "My Location");
                         self_c.coords_lbl.set_text(&format!("{:.4}, {:.4}", loc.latitude, loc.longitude));
@@ -686,6 +705,48 @@ impl MainWindow {
                     Err(e) => {
                         self_c.show_toast(&format!("Location unavailable: {}", e));
                     }
+                }
+            }
+        });
+    }
+
+    pub fn check_location_on_startup(self: &Rc<Self>) {
+        let (sender, receiver) = async_channel::bounded(1);
+        crate::runtime::spawn(async move {
+            let res = request_current_location().await;
+            let _ = sender.send(res).await;
+        });
+
+        let self_c = self.clone();
+        glib::spawn_future_local(async move {
+            if let Ok(Ok(loc)) = receiver.recv().await {
+                let s = settings::get();
+                let old_lat = s.last_current_lat;
+                let old_lon = s.last_current_lon;
+
+                let changed = match (old_lat, old_lon) {
+                    (Some(olat), Some(olon)) => {
+                        (olat - loc.latitude).abs() > 0.0005 || (olon - loc.longitude).abs() > 0.0005
+                    }
+                    _ => true,
+                };
+
+                let name = loc.label.unwrap_or_else(|| "Current Location".to_string());
+                settings::update(|st| {
+                    st.last_current_lat = Some(loc.latitude);
+                    st.last_current_lon = Some(loc.longitude);
+                    st.last_current_label = Some(name.clone());
+                    st.last_lat = loc.latitude;
+                    st.last_lon = loc.longitude;
+                });
+
+                self_c.map_view.set_user_location(loc.latitude, loc.longitude);
+                self_c.directions_panel.set_origin(loc.latitude, loc.longitude, "My Location");
+                self_c.coords_lbl.set_text(&format!("{:.4}, {:.4}", loc.latitude, loc.longitude));
+
+                if changed {
+                    self_c.map_view.center_on(loc.latitude, loc.longitude, Some(14.0));
+                    self_c.show_toast(&format!("Location updated: {}", name));
                 }
             }
         });
@@ -749,7 +810,6 @@ impl MainWindow {
             if let Ok(Ok(route)) = receiver.recv().await {
                 dp.display_route(&route);
                 mv.show_route(&route.coordinates);
-                mv.center_on(start.0, start.1, None);
             }
         });
     }

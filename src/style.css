@@ -395,3 +395,16 @@ window.maps-window button.map-control-btn:active {
     border-radius: 10px;
     padding: 2px 0;
 }
+
+/* Map Markers */
+.map-pin-user {
+    color: #89b4fa;
+}
+
+.map-pin-start {
+    color: #a6e3a1;
+}
+
+.map-pin-accent {
+    color: #f38ba8;
+}
