@@ -527,11 +527,15 @@ impl MainWindow {
         key_ctl.connect_key_pressed(move |_, key, _, modifier| {
             let ctrl = modifier.contains(gdk::ModifierType::CONTROL_MASK);
 
-            if ctrl && key == gdk::Key::f {
+            if ctrl && (key == gdk::Key::q || key == gdk::Key::Q || key == gdk::Key::w || key == gdk::Key::W) {
+                self_keys.window.close();
+                return glib::Propagation::Stop;
+            }
+            if ctrl && (key == gdk::Key::f || key == gdk::Key::F) {
                 self_keys.search_bar.focus();
                 return glib::Propagation::Stop;
             }
-            if ctrl && key == gdk::Key::b {
+            if ctrl && (key == gdk::Key::b || key == gdk::Key::B) {
                 let v = self_keys.side_panel.is_visible();
                 if v {
                     self_keys.side_panel.set_visible(false);
@@ -545,7 +549,7 @@ impl MainWindow {
                 }
                 return glib::Propagation::Stop;
             }
-            if ctrl && key == gdk::Key::r {
+            if ctrl && (key == gdk::Key::r || key == gdk::Key::R) {
                 self_keys.panel_stack.set_visible_child_name("directions");
                 self_keys.set_active_segment("directions");
                 self_keys.side_panel.set_visible(true);
