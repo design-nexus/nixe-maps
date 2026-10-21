@@ -73,6 +73,21 @@ pub fn tools() -> Value {
                 },
                 "required": ["category"]
             }
+        },
+        {
+            "name": "maps.select",
+            "description": "Select and display details for a place.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" },
+                    "address": { "type": "string" },
+                    "lat": { "type": "number" },
+                    "lon": { "type": "number" },
+                    "category": { "type": "string" }
+                },
+                "required": ["name", "address"]
+            }
         }
     ])
 }
@@ -233,6 +248,27 @@ pub fn handle(name: &str, args: Value, win_ref: Rc<RefCell<Option<Rc<MainWindow>
                     }
                 },
             );
+        }
+        "maps.select" => {
+            let name = args["name"].as_str().unwrap_or("Location").to_string();
+            let address = args["address"].as_str().unwrap_or("Address").to_string();
+            let lat = args["lat"].as_f64().unwrap_or(33.52068);
+            let lon = args["lon"].as_f64().unwrap_or(-86.80243);
+            let category = args["category"].as_str().map(|s| s.to_string());
+
+            if let Some(ref win) = *win_ref.borrow() {
+                win.search_bar.select_place(crate::providers::SearchResult {
+                    name,
+                    formatted_address: address,
+                    lat,
+                    lon,
+                    category,
+                });
+                win.window.present();
+                reply(Ok(json!({ "selected": true })));
+            } else {
+                reply(Err("Maps window not open".into()));
+            }
         }
         _ => reply(Err(format!("unknown tool {name}"))),
     }

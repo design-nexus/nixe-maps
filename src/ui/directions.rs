@@ -39,10 +39,23 @@ impl DirectionsPanel {
         db: Database,
         on_route_calculated: impl Fn(RouteResult) + 'static,
     ) -> Self {
-        let root = gtk::Box::new(gtk::Orientation::Vertical, 10);
-        root.add_css_class("panel-body");
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
         root.set_hexpand(false);
+        root.set_vexpand(true);
         root.set_size_request(320, -1);
+
+        let scroller = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vscrollbar_policy(gtk::PolicyType::External)
+            .propagate_natural_width(false)
+            .hexpand(false)
+            .vexpand(true)
+            .build();
+
+        let content = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        content.add_css_class("panel-body");
+        content.set_hexpand(false);
+        content.set_size_request(320, -1);
 
         // Travel mode switcher
         let mode_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
@@ -69,7 +82,7 @@ impl DirectionsPanel {
         mode_box.append(&mode_drive);
         mode_box.append(&mode_walk);
         mode_box.append(&mode_cycle);
-        root.append(&mode_box);
+        content.append(&mode_box);
 
         let current_mode = Rc::new(RefCell::new(TravelMode::Drive));
 
@@ -98,13 +111,13 @@ impl DirectionsPanel {
         let reverse_btn = widgets::bar_button("view-refresh-symbolic", "Reverse start and destination");
         reverse_btn.set_valign(gtk::Align::Center);
         inputs_box.append(&reverse_btn);
-        root.append(&inputs_box);
+        content.append(&inputs_box);
 
         // Route button
         let get_route_btn = gtk::Button::with_label("Get Directions");
         get_route_btn.add_css_class("suggested-action");
         get_route_btn.set_margin_top(4);
-        root.append(&get_route_btn);
+        content.append(&get_route_btn);
 
         // Status / Error message
         let status_label = gtk::Label::new(None);
@@ -114,7 +127,7 @@ impl DirectionsPanel {
         status_label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
         status_label.set_natural_wrap_mode(gtk::NaturalWrapMode::None);
         status_label.set_max_width_chars(28);
-        root.append(&status_label);
+        content.append(&status_label);
 
         // Summary Card
         let summary_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
@@ -133,20 +146,16 @@ impl DirectionsPanel {
         stats_row.append(&dist_label);
         summary_box.append(&stats_row);
 
-        root.append(&summary_box);
+        content.append(&summary_box);
 
         // Step-by-step maneuvers list
-        let steps_scroller = gtk::ScrolledWindow::new();
-        steps_scroller.set_hexpand(false);
-        steps_scroller.set_vexpand(true);
-        steps_scroller.set_propagate_natural_width(false);
-        steps_scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-
         let steps_list = gtk::ListBox::new();
         steps_list.set_hexpand(false);
         steps_list.add_css_class("group-list");
-        steps_scroller.set_child(Some(&steps_list));
-        root.append(&steps_scroller);
+        content.append(&steps_list);
+
+        scroller.set_child(Some(&content));
+        root.append(&scroller);
 
         let current_origin = Rc::new(RefCell::new(None));
         let current_dest = Rc::new(RefCell::new(None));

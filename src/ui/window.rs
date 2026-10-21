@@ -119,6 +119,7 @@ impl MainWindow {
         let side_panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
         side_panel.add_css_class("context-panel");
         side_panel.set_hexpand(false);
+        side_panel.set_halign(gtk::Align::Start);
         side_panel.set_size_request(320, -1);
         side_panel.set_visible(false);
 
@@ -755,6 +756,88 @@ impl MainWindow {
 
     pub fn search_query(&self, query: &str) {
         self.search_bar.set_text(query);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gtk_box_allocation() {
+        if gtk::init().is_err() {
+            return;
+        }
+        let box_widget = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        box_widget.set_hexpand(true);
+
+        let p1 = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        p1.set_hexpand(false);
+        p1.set_size_request(320, -1);
+
+        // Add panel header like window.rs
+        let panel_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let seg_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        seg_box.set_hexpand(true);
+        let btn_seg_places = gtk::Button::with_label("Places");
+        btn_seg_places.set_hexpand(true);
+        let btn_seg_route = gtk::Button::with_label("Directions");
+        btn_seg_route.set_hexpand(true);
+        seg_box.append(&btn_seg_places);
+        seg_box.append(&btn_seg_route);
+        panel_header.append(&seg_box);
+        p1.append(&panel_header);
+
+        let db = Database::in_memory().unwrap();
+        let pc = PlaceCard::new(db.clone(), || {}, |_| {});
+        pc.set_place(
+            &crate::providers::SearchResult {
+                name: "Walmart Supercenter".to_string(),
+                formatted_address: "Walmart Supercenter, 50, Foster Brook Boulevard, Foster Brook, Bradford, McKean County, Pennsylvania, 16701, United States".to_string(),
+                lat: 41.97,
+                lon: -78.63,
+                category: Some("commercial.supermarket".to_string()),
+            },
+            false,
+        );
+
+        let dp = DirectionsPanel::new(db, |_| {});
+
+        let panel_stack = gtk::Stack::new();
+        panel_stack.set_hexpand(false);
+        panel_stack.set_vexpand(true);
+        panel_stack.set_size_request(320, -1);
+        panel_stack.add_named(&pc.root, Some("place"));
+        panel_stack.add_named(&dp.root, Some("directions"));
+        panel_stack.set_visible_child_name("place");
+        p1.append(&panel_stack);
+
+        let p2 = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        p2.set_hexpand(true);
+
+        let cur_style = MapStyle::Standard;
+        let map_view = MapView::new(33.0, -86.0, 10.0, cur_style);
+        p2.append(&map_view.root);
+
+        box_widget.append(&p1);
+        box_widget.append(&p2);
+
+        let win = gtk::Window::builder().default_width(800).default_height(600).child(&box_widget).build();
+        win.present();
+        for _ in 0..15 {
+            gtk::glib::MainContext::default().iteration(false);
+        }
+
+        assert_eq!(p1.width(), 320, "Side panel width must be exactly 320px with PlaceCard visible");
+        assert_eq!(p2.width(), 480, "Map width must be remaining 480px with PlaceCard visible");
+
+        // Now test with directions panel visible
+        panel_stack.set_visible_child_name("directions");
+        for _ in 0..15 {
+            gtk::glib::MainContext::default().iteration(false);
+        }
+        assert_eq!(p1.width(), 320, "Side panel width must be exactly 320px with DirectionsPanel visible");
+        assert_eq!(p2.width(), 480, "Map width must be remaining 480px with DirectionsPanel visible");
     }
 }
 

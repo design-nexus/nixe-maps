@@ -165,6 +165,10 @@ impl SearchBar {
             self.popover.popdown();
         }
     }
+
+    pub fn select_place(&self, place: SearchResult) {
+        (self.on_select)(place);
+    }
 }
 
 fn populate_results(

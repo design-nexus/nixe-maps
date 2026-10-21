@@ -21,11 +21,24 @@ impl PlaceCard {
         on_back: impl Fn() + 'static,
         on_directions: impl Fn(SearchResult) + 'static,
     ) -> Self {
-        let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
-        root.add_css_class("place-card");
-        root.add_css_class("panel-body");
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
         root.set_hexpand(false);
+        root.set_vexpand(true);
         root.set_size_request(320, -1);
+
+        let scroller = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vscrollbar_policy(gtk::PolicyType::External)
+            .propagate_natural_width(false)
+            .hexpand(false)
+            .vexpand(true)
+            .build();
+
+        let content = gtk::Box::new(gtk::Orientation::Vertical, 8);
+        content.add_css_class("place-card");
+        content.add_css_class("panel-body");
+        content.set_hexpand(false);
+        content.set_size_request(320, -1);
 
         // Header with Back button and Title
         let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -35,19 +48,19 @@ impl PlaceCard {
 
         let title_label = gtk::Label::new(None);
         title_label.add_css_class("place-title");
-        title_label.set_hexpand(true);
+        title_label.set_hexpand(false);
         title_label.set_xalign(0.0);
         title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         title_label.set_max_width_chars(24);
         header.append(&title_label);
-        root.append(&header);
+        content.append(&header);
 
         // Category tag
         let category_label = gtk::Label::new(None);
         category_label.add_css_class("place-desc");
         category_label.set_xalign(0.0);
         category_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        root.append(&category_label);
+        content.append(&category_label);
 
         // Address
         let address_label = gtk::Label::new(None);
@@ -57,14 +70,14 @@ impl PlaceCard {
         address_label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
         address_label.set_natural_wrap_mode(gtk::NaturalWrapMode::None);
         address_label.set_max_width_chars(28);
-        root.append(&address_label);
+        content.append(&address_label);
 
         // Coordinates
         let coords_label = gtk::Label::new(None);
         coords_label.add_css_class("dim");
         coords_label.set_xalign(0.0);
         coords_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        root.append(&coords_label);
+        content.append(&coords_label);
 
         // Actions row
         let actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -101,7 +114,9 @@ impl PlaceCard {
         fav_btn.connect_clicked(move |_| fp_clone.popup());
         actions.append(&fav_btn);
 
-        root.append(&actions);
+        content.append(&actions);
+        scroller.set_child(Some(&content));
+        root.append(&scroller);
 
         let current_place: Rc<RefCell<Option<SearchResult>>> = Rc::new(RefCell::new(None));
         let cp_dir = current_place.clone();
@@ -187,7 +202,7 @@ impl PlacesHubView {
         scroller.set_hexpand(false);
         scroller.set_vexpand(true);
         scroller.set_propagate_natural_width(false);
-        scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+        scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::External);
 
         let content = gtk::Box::new(gtk::Orientation::Vertical, 14);
         content.add_css_class("panel-body");
