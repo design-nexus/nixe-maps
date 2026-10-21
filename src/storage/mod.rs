@@ -1,3 +1,4 @@
 pub mod sqlite;
 
-pub use sqlite::{Database, FavoritePlace, db};
+#[allow(unused_imports)]
+pub use sqlite::{Database, FavoritePlace, RecentSearch, db};

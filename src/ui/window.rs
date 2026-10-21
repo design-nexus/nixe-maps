@@ -5,7 +5,7 @@ use crate::settings_dialog;
 use crate::storage::{Database, db};
 use crate::ui::directions::DirectionsPanel;
 use crate::ui::map::MapView;
-use crate::ui::places::{PlaceCard, SavedPlacesView};
+use crate::ui::places::{PlaceCard, PlacesHubView};
 use crate::ui::search::SearchBar;
 use gtk::gdk;
 use gtk::glib;
@@ -26,7 +26,9 @@ pub struct MainWindow {
     search_bar: Rc<SearchBar>,
     directions_panel: Rc<DirectionsPanel>,
     place_card: Rc<PlaceCard>,
-    saved_places_view: Rc<SavedPlacesView>,
+    places_hub_view: Rc<PlacesHubView>,
+    btn_seg_places: gtk::Button,
+    btn_seg_route: gtk::Button,
     style_btn: gtk::Button,
     attribution_lbl: gtk::Label,
     coords_lbl: gtk::Label,
@@ -93,7 +95,7 @@ impl MainWindow {
         style_btn.connect_clicked(move |_| sp_clone.popup());
         topbar.append(&style_btn);
 
-        // Search Bar
+        // Search Bar Holder
         let search_holder = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         search_holder.set_hexpand(true);
         topbar.append(&search_holder);
@@ -113,12 +115,37 @@ impl MainWindow {
         body_hbox.set_hexpand(true);
         body_hbox.set_vexpand(true);
 
-        // Contextual Side Panel
+        // Contextual Side Panel (320px)
         let side_panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
         side_panel.add_css_class("context-panel");
         side_panel.set_hexpand(false);
         side_panel.set_size_request(320, -1);
         side_panel.set_visible(false);
+
+        // Sidebar Header: Segmented Switcher [ Places | Directions ] + Close
+        let panel_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        panel_header.add_css_class("panel-header");
+
+        let seg_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        seg_box.add_css_class("panel-segmented");
+        seg_box.set_hexpand(true);
+
+        let btn_seg_places = gtk::Button::with_label("Places");
+        btn_seg_places.add_css_class("segment-btn");
+        btn_seg_places.add_css_class("active");
+        btn_seg_places.set_hexpand(true);
+
+        let btn_seg_route = gtk::Button::with_label("Directions");
+        btn_seg_route.add_css_class("segment-btn");
+        btn_seg_route.set_hexpand(true);
+
+        seg_box.append(&btn_seg_places);
+        seg_box.append(&btn_seg_route);
+        panel_header.append(&seg_box);
+
+        let panel_close = widgets::bar_button("window-close-symbolic", "Collapse sidebar (Ctrl+B)");
+        panel_header.append(&panel_close);
+        side_panel.append(&panel_header);
 
         let panel_stack = gtk::Stack::new();
         panel_stack.set_transition_type(gtk::StackTransitionType::Crossfade);
@@ -216,12 +243,15 @@ impl MainWindow {
 
         window.set_child(Some(&overlay));
 
-        let toast_timer = Rc::new(RefCell::new(None));
+        let toast_timer: Rc<RefCell<Option<glib::SourceId>>> = Rc::new(RefCell::new(None));
 
         // --- CONSTRUCT SUB-PANELS ---
         // 1. Directions Panel
         let mv_dir = map_view.clone();
         let sp_dir = side_panel.clone();
+        let ps_dir = panel_stack.clone();
+        let bp_dir = btn_seg_places.clone();
+        let br_dir = btn_seg_route.clone();
         let directions_panel = Rc::new(DirectionsPanel::new(
             database.clone(),
             move |route| {
@@ -230,8 +260,23 @@ impl MainWindow {
                     mv_dir.center_on(first.0, first.1, None);
                 }
             },
-            move || {
-                sp_dir.set_visible(false);
+            {
+                let ps = ps_dir.clone();
+                let bp = bp_dir.clone();
+                let br = br_dir.clone();
+                move || {
+                    ps.set_visible_child_name("hub");
+                    br.remove_css_class("active");
+                    bp.add_css_class("active");
+                }
+            },
+            {
+                let sp = sp_dir.clone();
+                let mv = map_view.clone();
+                move || {
+                    sp.set_visible(false);
+                    mv.clear_route();
+                }
             },
         ));
         panel_stack.add_named(&directions_panel.root, Some("directions"));
@@ -239,55 +284,166 @@ impl MainWindow {
         // 2. Place Card
         let dp_c = directions_panel.clone();
         let pstack_c = panel_stack.clone();
-        let sp_pc = side_panel.clone();
         let mv_pc = map_view.clone();
+        let bp_pc = btn_seg_places.clone();
+        let br_pc = btn_seg_route.clone();
         let place_card = Rc::new(PlaceCard::new(
             database.clone(),
-            move |place| {
-                dp_c.set_destination(place.lat, place.lon, &place.name);
-                pstack_c.set_visible_child_name("directions");
+            {
+                let ps = pstack_c.clone();
+                let bp = bp_pc.clone();
+                let br = br_pc.clone();
+                move || {
+                    ps.set_visible_child_name("hub");
+                    br.remove_css_class("active");
+                    bp.add_css_class("active");
+                }
             },
-            move || {
-                mv_pc.clear_selected_marker();
-                sp_pc.set_visible(false);
+            {
+                let dp = dp_c.clone();
+                let ps = pstack_c.clone();
+                let bp = bp_pc.clone();
+                let br = br_pc.clone();
+                move |place| {
+                    dp.set_destination(place.lat, place.lon, &place.name);
+                    ps.set_visible_child_name("directions");
+                    bp.remove_css_class("active");
+                    br.add_css_class("active");
+                }
+            },
+            {
+                let mv = mv_pc.clone();
+                let ps = pstack_c.clone();
+                let bp = bp_pc.clone();
+                let br = br_pc.clone();
+                move || {
+                    mv.clear_selected_marker();
+                    ps.set_visible_child_name("hub");
+                    br.remove_css_class("active");
+                    bp.add_css_class("active");
+                }
             },
         ));
         panel_stack.add_named(&place_card.root, Some("place"));
 
-        // 3. Saved Places
-        let mv_sav = map_view.clone();
-        let pc_sav = place_card.clone();
-        let pstack_sav = panel_stack.clone();
-        let saved_places_view = Rc::new(SavedPlacesView::new(database.clone(), move |fav| {
-            mv_sav.center_on(fav.lat, fav.lon, Some(14.0));
-            mv_sav.set_selected_marker(fav.lat, fav.lon, &fav.name);
-            pc_sav.set_place(
-                &SearchResult {
-                    name: fav.name,
-                    formatted_address: fav.address,
-                    lat: fav.lat,
-                    lon: fav.lon,
-                    category: Some(fav.label),
-                },
-                true,
-            );
-            pstack_sav.set_visible_child_name("place");
-        }));
-        panel_stack.add_named(&saved_places_view.root, Some("saved"));
+        // 3. Places Hub
+        let mv_hub = map_view.clone();
+        let pc_hub = place_card.clone();
+        let ps_hub = panel_stack.clone();
+        let db_hub = database.clone();
+        let bp_hub = btn_seg_places.clone();
+        let br_hub = btn_seg_route.clone();
+
+        let toast_lbl_c = toast_lbl.clone();
+        let toast_timer_c = toast_timer.clone();
+        let toast_fn = move |msg: &str| {
+            toast_lbl_c.set_text(msg);
+            toast_lbl_c.set_visible(true);
+            if let Some(src) = toast_timer_c.borrow_mut().take() {
+                src.remove();
+            }
+            let lbl = toast_lbl_c.clone();
+            let timer = toast_timer_c.clone();
+            let id = glib::timeout_add_local_once(Duration::from_millis(3500), move || {
+                lbl.set_visible(false);
+                *timer.borrow_mut() = None;
+            });
+            *toast_timer_c.borrow_mut() = Some(id);
+        };
+
+        let search_bar_cell: Rc<RefCell<Option<Rc<SearchBar>>>> = Rc::new(RefCell::new(None));
+        let sbc_clone = search_bar_cell.clone();
+
+        let places_hub_view = Rc::new(PlacesHubView::new(
+            database.clone(),
+            {
+                let mv = mv_hub.clone();
+                let pc = pc_hub.clone();
+                let ps = ps_hub.clone();
+                let db = db_hub.clone();
+                let bp = bp_hub.clone();
+                let br = br_hub.clone();
+                move |place| {
+                    mv.center_on(place.lat, place.lon, Some(14.0));
+                    mv.set_selected_marker(place.lat, place.lon, &place.name);
+                    let is_fav = db.list_favorites().map(|favs| favs.iter().any(|f| f.name == place.name)).unwrap_or(false);
+                    pc.set_place(&place, is_fav);
+                    ps.set_visible_child_name("place");
+                    br.remove_css_class("active");
+                    bp.add_css_class("active");
+                }
+            },
+            {
+                let ps = ps_hub.clone();
+                let bp = bp_hub.clone();
+                let br = br_hub.clone();
+                move || {
+                    ps.set_visible_child_name("directions");
+                    bp.remove_css_class("active");
+                    br.add_css_class("active");
+                }
+            },
+            {
+                let sbc = sbc_clone.clone();
+                move |query| {
+                    if let Some(ref sb) = *sbc.borrow() {
+                        sb.set_text(query);
+                        sb.focus();
+                    }
+                }
+            },
+            toast_fn,
+        ));
+        panel_stack.add_named(&places_hub_view.root, Some("hub"));
 
         // 4. Search Bar
         let mv_search = map_view.clone();
         let pc_search = place_card.clone();
         let pstack_search = panel_stack.clone();
         let sp_search = side_panel.clone();
+        let phv_search = places_hub_view.clone();
+        let db_search = database.clone();
+        let bp_search = btn_seg_places.clone();
+        let br_search = btn_seg_route.clone();
         let search_bar = Rc::new(SearchBar::new(database.clone(), move |place| {
             mv_search.center_on(place.lat, place.lon, Some(14.0));
             mv_search.set_selected_marker(place.lat, place.lon, &place.name);
-            pc_search.set_place(&place, false);
+            let is_fav = db_search.list_favorites().map(|favs| favs.iter().any(|f| f.name == place.name)).unwrap_or(false);
+            pc_search.set_place(&place, is_fav);
             pstack_search.set_visible_child_name("place");
+            br_search.remove_css_class("active");
+            bp_search.add_css_class("active");
             sp_search.set_visible(true);
+            phv_search.refresh();
         }));
+        *search_bar_cell.borrow_mut() = Some(search_bar.clone());
         search_holder.append(&search_bar.root);
+
+        // Wire Segment buttons
+        let ps_s1 = panel_stack.clone();
+        let bp_s1 = btn_seg_places.clone();
+        let br_s1 = btn_seg_route.clone();
+        let phv_s1 = places_hub_view.clone();
+        btn_seg_places.connect_clicked(move |_| {
+            phv_s1.refresh();
+            ps_s1.set_visible_child_name("hub");
+            br_s1.remove_css_class("active");
+            bp_s1.add_css_class("active");
+        });
+
+        let ps_s2 = panel_stack.clone();
+        let bp_s2 = btn_seg_places.clone();
+        let br_s2 = btn_seg_route.clone();
+        btn_seg_route.connect_clicked(move |_| {
+            ps_s2.set_visible_child_name("directions");
+            bp_s2.remove_css_class("active");
+            br_s2.add_css_class("active");
+        });
+
+        let sp_close = side_panel.clone();
+        panel_close.connect_clicked(move |_| {
+            sp_close.set_visible(false);
+        });
 
         let main_win = Rc::new(Self {
             window,
@@ -298,7 +454,9 @@ impl MainWindow {
             search_bar,
             directions_panel,
             place_card,
-            saved_places_view,
+            places_hub_view,
+            btn_seg_places,
+            btn_seg_route,
             style_btn,
             attribution_lbl,
             coords_lbl,
@@ -333,36 +491,20 @@ impl MainWindow {
         // Toggle side panel
         let sp_clone = self.side_panel.clone();
         let pstack_clone = self.panel_stack.clone();
-        let sav_clone = self.saved_places_view.clone();
-        let mv_clone = self.map_view.clone();
-        let pc_clone = self.place_card.clone();
-        let ps_clone = self.panel_stack.clone();
+        let hub_clone = self.places_hub_view.clone();
+        let bp_clone = self.btn_seg_places.clone();
+        let br_clone = self.btn_seg_route.clone();
 
         sidebar_toggle.connect_clicked(move |_| {
             if sp_clone.is_visible() {
                 sp_clone.set_visible(false);
             } else {
-                sav_clone.refresh({
-                    let mv = mv_clone.clone();
-                    let pc = pc_clone.clone();
-                    let ps = ps_clone.clone();
-                    move |fav| {
-                        mv.center_on(fav.lat, fav.lon, Some(14.0));
-                        mv.set_selected_marker(fav.lat, fav.lon, &fav.name);
-                        pc.set_place(
-                            &SearchResult {
-                                name: fav.name,
-                                formatted_address: fav.address,
-                                lat: fav.lat,
-                                lon: fav.lon,
-                                category: Some(fav.label),
-                            },
-                            true,
-                        );
-                        ps.set_visible_child_name("place");
-                    }
-                });
-                pstack_clone.set_visible_child_name("saved");
+                hub_clone.refresh();
+                if pstack_clone.visible_child_name().is_none() {
+                    pstack_clone.set_visible_child_name("hub");
+                    br_clone.remove_css_class("active");
+                    bp_clone.add_css_class("active");
+                }
                 sp_clone.set_visible(true);
             }
         });
@@ -370,11 +512,15 @@ impl MainWindow {
         // Toggle directions
         let sp_c2 = self.side_panel.clone();
         let pstack_c2 = self.panel_stack.clone();
+        let bp_c2 = self.btn_seg_places.clone();
+        let br_c2 = self.btn_seg_route.clone();
         directions_toggle.connect_clicked(move |_| {
             if sp_c2.is_visible() && pstack_c2.visible_child_name().as_deref() == Some("directions") {
                 sp_c2.set_visible(false);
             } else {
                 pstack_c2.set_visible_child_name("directions");
+                bp_c2.remove_css_class("active");
+                br_c2.add_css_class("active");
                 sp_c2.set_visible(true);
             }
         });
@@ -427,11 +573,21 @@ impl MainWindow {
             }
             if ctrl && key == gdk::Key::b {
                 let v = self_keys.side_panel.is_visible();
-                self_keys.side_panel.set_visible(!v);
+                if v {
+                    self_keys.side_panel.set_visible(false);
+                } else {
+                    self_keys.places_hub_view.refresh();
+                    if self_keys.panel_stack.visible_child_name().is_none() {
+                        self_keys.panel_stack.set_visible_child_name("hub");
+                        self_keys.set_active_segment("places");
+                    }
+                    self_keys.side_panel.set_visible(true);
+                }
                 return glib::Propagation::Stop;
             }
             if ctrl && key == gdk::Key::r {
                 self_keys.panel_stack.set_visible_child_name("directions");
+                self_keys.set_active_segment("directions");
                 self_keys.side_panel.set_visible(true);
                 return glib::Propagation::Stop;
             }
@@ -453,7 +609,13 @@ impl MainWindow {
             }
             if key == gdk::Key::Escape {
                 if self_keys.side_panel.is_visible() {
-                    self_keys.side_panel.set_visible(false);
+                    let cur = self_keys.panel_stack.visible_child_name();
+                    if cur.as_deref() == Some("place") || cur.as_deref() == Some("directions") {
+                        self_keys.panel_stack.set_visible_child_name("hub");
+                        self_keys.set_active_segment("places");
+                    } else {
+                        self_keys.side_panel.set_visible(false);
+                    }
                     return glib::Propagation::Stop;
                 }
             }
@@ -472,6 +634,16 @@ impl MainWindow {
             });
             glib::Propagation::Proceed
         });
+    }
+
+    pub fn set_active_segment(&self, mode: &str) {
+        if mode == "directions" {
+            self.btn_seg_places.remove_css_class("active");
+            self.btn_seg_route.add_css_class("active");
+        } else {
+            self.btn_seg_route.remove_css_class("active");
+            self.btn_seg_places.add_css_class("active");
+        }
     }
 
     pub fn set_map_style(&self, style: MapStyle) {
@@ -531,6 +703,7 @@ impl MainWindow {
     pub fn open_location(&self, lat: f64, lon: f64, label: &str) {
         self.map_view.center_on(lat, lon, Some(14.0));
         self.map_view.set_selected_marker(lat, lon, label);
+        let is_fav = self.db.list_favorites().map(|favs| favs.iter().any(|f| f.name == label)).unwrap_or(false);
         self.place_card.set_place(
             &SearchResult {
                 name: label.to_string(),
@@ -539,8 +712,9 @@ impl MainWindow {
                 lon,
                 category: None,
             },
-            false,
+            is_fav,
         );
+        self.set_active_segment("places");
         self.panel_stack.set_visible_child_name("place");
         self.side_panel.set_visible(true);
     }
@@ -548,6 +722,7 @@ impl MainWindow {
     pub fn open_route(&self, start: (f64, f64), end: (f64, f64), mode: &str) {
         self.directions_panel.set_origin(start.0, start.1, &format!("{:.4}, {:.4}", start.0, start.1));
         self.directions_panel.set_destination(end.0, end.1, &format!("{:.4}, {:.4}", end.0, end.1));
+        self.set_active_segment("directions");
         self.panel_stack.set_visible_child_name("directions");
         self.side_panel.set_visible(true);
 
@@ -584,7 +759,7 @@ fn show_shortcuts() {
         ("+ / =", "Zoom in"),
         ("-", "Zoom out"),
         ("F1", "Show shortcuts list"),
-        ("Esc", "Close panels and cards"),
+        ("Esc", "Back / Close panels"),
         ("Ctrl+Q", "Quit application"),
     ];
 

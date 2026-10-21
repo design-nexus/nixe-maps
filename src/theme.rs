@@ -10,6 +10,7 @@ pub fn install_icons() {
         ("drive-symbolic", include_str!("../data/icons/drive-symbolic.svg")),
         ("walk-symbolic", include_str!("../data/icons/walk-symbolic.svg")),
         ("bicycle-symbolic", include_str!("../data/icons/bicycle-symbolic.svg")),
+        ("work-symbolic", include_str!("../data/icons/work-symbolic.svg")),
         ("layers-symbolic", include_str!("../data/icons/layers-symbolic.svg")),
     ];
     for (name, svg) in ICONS {

@@ -1,5 +1,5 @@
 use crate::providers::SearchResult;
-use crate::storage::{Database, FavoritePlace};
+use crate::storage::Database;
 use gtk::prelude::*;
 use nixe_ui::widgets;
 use std::cell::RefCell;
@@ -12,31 +12,35 @@ pub struct PlaceCard {
     coords_label: gtk::Label,
     category_label: gtk::Label,
     fav_btn: gtk::Button,
-    #[allow(dead_code)]
-    directions_btn: gtk::Button,
     current_place: Rc<RefCell<Option<SearchResult>>>,
 }
 
 impl PlaceCard {
     pub fn new(
         db: Database,
+        on_back: impl Fn() + 'static,
         on_directions: impl Fn(SearchResult) + 'static,
         on_close: impl Fn() + 'static,
     ) -> Self {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
         root.add_css_class("place-card");
+        root.add_css_class("panel-body");
         root.set_hexpand(false);
 
-        // Header with title and close button
-        let header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        // Header with Back button, Title, and Close button
+        let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let back_btn = widgets::bar_button("go-previous-symbolic", "Back to explore");
+        back_btn.connect_clicked(move |_| on_back());
+        header.append(&back_btn);
+
         let title_label = gtk::Label::new(None);
         title_label.add_css_class("place-title");
         title_label.set_hexpand(true);
         title_label.set_xalign(0.0);
-        title_label.set_wrap(true);
+        title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         header.append(&title_label);
 
-        let close_btn = widgets::bar_button("window-close-symbolic", "Close place card");
+        let close_btn = widgets::bar_button("window-close-symbolic", "Close");
         close_btn.connect_clicked(move |_| on_close());
         header.append(&close_btn);
         root.append(&header);
@@ -68,8 +72,31 @@ impl PlaceCard {
         directions_btn.add_css_class("suggested-action");
         actions.append(&directions_btn);
 
-        let fav_btn = gtk::Button::with_label("★ Save");
+        let fav_btn = gtk::Button::with_label("★ Save ▾");
         fav_btn.add_css_class("flat");
+
+        let fav_popover = gtk::Popover::new();
+        fav_popover.set_parent(&fav_btn);
+        let pop_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        pop_box.set_margin_start(4);
+        pop_box.set_margin_end(4);
+        pop_box.set_margin_top(4);
+        pop_box.set_margin_bottom(4);
+
+        let btn_fav_star = gtk::Button::with_label("★ Save as Favorite");
+        btn_fav_star.add_css_class("flat");
+        let btn_fav_home = gtk::Button::with_label("⌂ Set as Home");
+        btn_fav_home.add_css_class("flat");
+        let btn_fav_work = gtk::Button::with_label("💼 Set as Work");
+        btn_fav_work.add_css_class("flat");
+
+        pop_box.append(&btn_fav_star);
+        pop_box.append(&btn_fav_home);
+        pop_box.append(&btn_fav_work);
+        fav_popover.set_child(Some(&pop_box));
+
+        let fp_clone = fav_popover.clone();
+        fav_btn.connect_clicked(move |_| fp_clone.popup());
         actions.append(&fav_btn);
 
         root.append(&actions);
@@ -82,16 +109,19 @@ impl PlaceCard {
             }
         });
 
-        let cp_fav = current_place.clone();
-        let db_clone = db.clone();
-        let fb_clone = fav_btn.clone();
-        fav_btn.connect_clicked(move |_| {
-            if let Some(ref p) = *cp_fav.borrow() {
-                let _ = db_clone.add_favorite(&p.name, "favorite", p.lat, p.lon, &p.formatted_address);
-                fb_clone.set_label("★ Saved");
-                fb_clone.set_sensitive(false);
-            }
-        });
+        let setup_save = |btn: &gtk::Button, label: &'static str, pop: gtk::Popover, cp: Rc<RefCell<Option<SearchResult>>>, db: Database, fb: gtk::Button| {
+            btn.connect_clicked(move |_| {
+                pop.popdown();
+                if let Some(ref p) = *cp.borrow() {
+                    let _ = db.add_favorite(&p.name, label, p.lat, p.lon, &p.formatted_address);
+                    fb.set_label("★ Saved");
+                }
+            });
+        };
+
+        setup_save(&btn_fav_star, "favorite", fav_popover.clone(), current_place.clone(), db.clone(), fav_btn.clone());
+        setup_save(&btn_fav_home, "home", fav_popover.clone(), current_place.clone(), db.clone(), fav_btn.clone());
+        setup_save(&btn_fav_work, "work", fav_popover.clone(), current_place.clone(), db.clone(), fav_btn.clone());
 
         Self {
             root,
@@ -100,7 +130,6 @@ impl PlaceCard {
             coords_label,
             category_label,
             fav_btn,
-            directions_btn,
             current_place,
         }
     }
@@ -120,76 +149,237 @@ impl PlaceCard {
 
         if is_favorite {
             self.fav_btn.set_label("★ Saved");
-            self.fav_btn.set_sensitive(false);
         } else {
-            self.fav_btn.set_label("★ Save");
-            self.fav_btn.set_sensitive(true);
+            self.fav_btn.set_label("★ Save ▾");
         }
 
         self.root.set_visible(true);
     }
-
-    #[allow(dead_code)]
-    pub fn hide(&self) {
-        self.root.set_visible(false);
-        *self.current_place.borrow_mut() = None;
-    }
 }
 
-pub struct SavedPlacesView {
+pub struct PlacesHubView {
     pub root: gtk::Box,
-    list_box: gtk::ListBox,
+    saved_list: gtk::ListBox,
+    recents_list: gtk::ListBox,
+    btn_home_chip: gtk::Button,
+    btn_work_chip: gtk::Button,
     db: Database,
+    on_select_place: Rc<dyn Fn(SearchResult)>,
+    on_toast: Rc<dyn Fn(&str)>,
 }
 
-impl SavedPlacesView {
-    pub fn new(db: Database, on_select: impl Fn(FavoritePlace) + 'static) -> Self {
-        let root = gtk::Box::new(gtk::Orientation::Vertical, 6);
+impl PlacesHubView {
+    pub fn new(
+        db: Database,
+        on_select_place: impl Fn(SearchResult) + 'static,
+        on_open_directions: impl Fn() + 'static,
+        on_category_search: impl Fn(&str) + 'static,
+        on_toast: impl Fn(&str) + 'static,
+    ) -> Self {
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
         root.set_hexpand(false);
-        root.add_css_class("panel-body");
-
-        let title = gtk::Label::new(Some("SAVED PLACES"));
-        title.add_css_class("panel-title");
-        title.set_xalign(0.0);
-        title.set_margin_bottom(4);
-        root.append(&title);
-
-        let list_box = gtk::ListBox::new();
-        list_box.set_hexpand(false);
-        list_box.add_css_class("group-list");
+        root.set_vexpand(true);
 
         let scroller = gtk::ScrolledWindow::new();
         scroller.set_hexpand(false);
         scroller.set_vexpand(true);
         scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-        scroller.set_child(Some(&list_box));
-        root.append(&scroller);
 
-        let db_c = db.clone();
-        let view = Self {
-            root,
-            list_box,
-            db: db_c,
+        let content = gtk::Box::new(gtk::Orientation::Vertical, 14);
+        content.add_css_class("panel-body");
+        content.set_hexpand(false);
+
+        // --- 1. QUICK WAYPOINT CHIPS ---
+        let chips_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        chips_box.set_hexpand(false);
+
+        let make_chip = |icon: &str, label: &str| -> gtk::Button {
+            let btn = gtk::Button::new();
+            btn.add_css_class("waypoint-chip");
+            btn.set_hexpand(true);
+            let h = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            h.set_halign(gtk::Align::Center);
+            let img = gtk::Image::from_icon_name(icon);
+            img.set_pixel_size(14);
+            h.append(&img);
+            let lbl = gtk::Label::new(Some(label));
+            h.append(&lbl);
+            btn.set_child(Some(&h));
+            btn
         };
 
-        view.refresh(on_select);
-        view
-    }
+        let btn_home_chip = make_chip("user-home-symbolic", "Home");
+        btn_home_chip.set_tooltip_text(Some("Go to Home"));
+        let btn_work_chip = make_chip("work-symbolic", "Work");
+        btn_work_chip.set_tooltip_text(Some("Go to Work"));
+        let btn_route_chip = make_chip("directions-symbolic", "Route");
+        btn_route_chip.set_tooltip_text(Some("Plan a route"));
+        btn_route_chip.connect_clicked(move |_| on_open_directions());
 
-    pub fn refresh(&self, on_select: impl Fn(FavoritePlace) + 'static) {
-        // Clear children
-        while let Some(child) = self.list_box.first_child() {
-            self.list_box.remove(&child);
+        chips_box.append(&btn_home_chip);
+        chips_box.append(&btn_work_chip);
+        chips_box.append(&btn_route_chip);
+        content.append(&chips_box);
+
+        // --- 2. SAVED PLACES SECTION ---
+        let saved_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let saved_title = gtk::Label::new(Some("SAVED PLACES"));
+        saved_title.add_css_class("panel-section-title");
+        saved_title.set_hexpand(true);
+        saved_title.set_xalign(0.0);
+        saved_header.append(&saved_title);
+        content.append(&saved_header);
+
+        let saved_list = gtk::ListBox::new();
+        saved_list.add_css_class("group-list");
+        content.append(&saved_list);
+
+        // --- 3. RECENT SEARCHES SECTION ---
+        let recents_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let recents_title = gtk::Label::new(Some("RECENT SEARCHES"));
+        recents_title.add_css_class("panel-section-title");
+        recents_title.set_hexpand(true);
+        recents_title.set_xalign(0.0);
+        recents_header.append(&recents_title);
+
+        let clear_recents_btn = gtk::Button::with_label("Clear");
+        clear_recents_btn.add_css_class("flat");
+        clear_recents_btn.add_css_class("group-action-btn");
+        recents_header.append(&clear_recents_btn);
+        content.append(&recents_header);
+
+        let recents_list = gtk::ListBox::new();
+        recents_list.add_css_class("group-list");
+        content.append(&recents_list);
+
+        // --- 4. EXPLORE NEARBY CATEGORIES ---
+        let nearby_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let nearby_title = gtk::Label::new(Some("EXPLORE NEARBY"));
+        nearby_title.add_css_class("panel-section-title");
+        nearby_title.set_hexpand(true);
+        nearby_title.set_xalign(0.0);
+        nearby_header.append(&nearby_title);
+        content.append(&nearby_header);
+
+        let nearby_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        nearby_box.add_css_class("nearby-chips");
+        let on_cat = Rc::new(on_category_search);
+        let categories = [
+            ("☕ Coffee", "coffee"),
+            ("🍽 Food", "restaurant"),
+            ("⛽ Fuel", "gas"),
+            ("🅿 Parking", "parking"),
+            ("🌲 Parks", "park"),
+        ];
+
+        for (label, query) in categories {
+            let cat_btn = gtk::Button::with_label(label);
+            cat_btn.add_css_class("nearby-chip");
+            let c_query = query.to_string();
+            let c_cb = on_cat.clone();
+            cat_btn.connect_clicked(move |_| c_cb(&c_query));
+            nearby_box.append(&cat_btn);
         }
 
-        let on_select = Rc::new(on_select);
+        let nearby_scroll = gtk::ScrolledWindow::new();
+        nearby_scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Never);
+        nearby_scroll.set_child(Some(&nearby_box));
+        content.append(&nearby_scroll);
+
+        scroller.set_child(Some(&content));
+        root.append(&scroller);
+
+        let on_sel_rc = Rc::new(on_select_place);
+        let on_toast_rc = Rc::new(on_toast);
+
+        let hub = Self {
+            root,
+            saved_list,
+            recents_list,
+            btn_home_chip,
+            btn_work_chip,
+            db,
+            on_select_place: on_sel_rc,
+            on_toast: on_toast_rc,
+        };
+
+        // Wire home & work chips
+        hub.bind_chips();
+
+        // Wire clear recents
+        let db_clear = hub.db.clone();
+        let toast_clear = hub.on_toast.clone();
+        let rlist_clear = hub.recents_list.clone();
+        clear_recents_btn.connect_clicked(move |_| {
+            let _ = db_clear.clear_recent_searches();
+            while let Some(child) = rlist_clear.first_child() {
+                rlist_clear.remove(&child);
+            }
+            let empty = gtk::Label::new(Some("No recent searches."));
+            empty.add_css_class("dim");
+            empty.set_margin_top(8);
+            empty.set_margin_bottom(8);
+            rlist_clear.append(&empty);
+            toast_clear("Cleared recent searches");
+        });
+
+        hub.refresh();
+        hub
+    }
+
+    fn bind_chips(&self) {
+        let db_home = self.db.clone();
+        let on_sel_home = self.on_select_place.clone();
+        let on_toast_home = self.on_toast.clone();
+        self.btn_home_chip.connect_clicked(move |_| {
+            if let Ok(Some(home)) = db_home.get_favorite_by_label("home") {
+                on_sel_home(SearchResult {
+                    name: home.name,
+                    formatted_address: home.address,
+                    lat: home.lat,
+                    lon: home.lon,
+                    category: Some("home".into()),
+                });
+            } else {
+                on_toast_home("Home not set. Star a place and choose 'Set as Home'!");
+            }
+        });
+
+        let db_work = self.db.clone();
+        let on_sel_work = self.on_select_place.clone();
+        let on_toast_work = self.on_toast.clone();
+        self.btn_work_chip.connect_clicked(move |_| {
+            if let Ok(Some(work)) = db_work.get_favorite_by_label("work") {
+                on_sel_work(SearchResult {
+                    name: work.name,
+                    formatted_address: work.address,
+                    lat: work.lat,
+                    lon: work.lon,
+                    category: Some("work".into()),
+                });
+            } else {
+                on_toast_work("Work not set. Star a place and choose 'Set as Work'!");
+            }
+        });
+    }
+
+    pub fn refresh(&self) {
+        self.refresh_saved();
+        self.refresh_recents();
+    }
+
+    fn refresh_saved(&self) {
+        while let Some(child) = self.saved_list.first_child() {
+            self.saved_list.remove(&child);
+        }
+
         if let Ok(places) = self.db.list_favorites() {
             if places.is_empty() {
                 let empty = gtk::Label::new(Some("No saved places yet."));
                 empty.add_css_class("dim");
-                empty.set_margin_top(12);
-                empty.set_margin_bottom(12);
-                self.list_box.append(&empty);
+                empty.set_margin_top(8);
+                empty.set_margin_bottom(8);
+                self.saved_list.append(&empty);
                 return;
             }
 
@@ -199,10 +389,9 @@ impl SavedPlacesView {
 
                 let icon_name = match place.label.as_str() {
                     "home" => "user-home-symbolic",
-                    "work" => "applications-office-symbolic",
+                    "work" => "work-symbolic",
                     _ => "starred-symbolic",
                 };
-
                 let icon = gtk::Image::from_icon_name(icon_name);
                 icon.set_pixel_size(16);
                 row.append(&icon);
@@ -213,6 +402,7 @@ impl SavedPlacesView {
                 let name_lbl = gtk::Label::new(Some(&place.name));
                 name_lbl.add_css_class("place-title");
                 name_lbl.set_xalign(0.0);
+                name_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
                 info_box.append(&name_lbl);
 
                 let addr_lbl = gtk::Label::new(Some(&place.address));
@@ -223,15 +413,95 @@ impl SavedPlacesView {
 
                 row.append(&info_box);
 
+                // Delete button on right
+                let del_btn = widgets::bar_button("window-close-symbolic", "Remove");
+                del_btn.add_css_class("dim");
+                let db_del = self.db.clone();
+                let pid = place.id;
+                let toast_del = self.on_toast.clone();
+                let r_clone = row.clone();
+                let sl_clone = self.saved_list.clone();
+                del_btn.connect_clicked(move |_| {
+                    let _ = db_del.remove_favorite(pid);
+                    sl_clone.remove(&r_clone);
+                    toast_del("Removed from saved places");
+                });
+                row.append(&del_btn);
+
                 let pl_clone = place.clone();
-                let os_clone = on_select.clone();
+                let on_sel = self.on_select_place.clone();
                 let gesture = gtk::GestureClick::new();
                 gesture.connect_released(move |_, _, _, _| {
-                    os_clone(pl_clone.clone());
+                    on_sel(SearchResult {
+                        name: pl_clone.name.clone(),
+                        formatted_address: pl_clone.address.clone(),
+                        lat: pl_clone.lat,
+                        lon: pl_clone.lon,
+                        category: Some(pl_clone.label.clone()),
+                    });
                 });
                 row.add_controller(gesture);
 
-                self.list_box.append(&row);
+                self.saved_list.append(&row);
+            }
+        }
+    }
+
+    fn refresh_recents(&self) {
+        while let Some(child) = self.recents_list.first_child() {
+            self.recents_list.remove(&child);
+        }
+
+        if let Ok(recents) = self.db.list_recent_searches() {
+            if recents.is_empty() {
+                let empty = gtk::Label::new(Some("No recent searches."));
+                empty.add_css_class("dim");
+                empty.set_margin_top(8);
+                empty.set_margin_bottom(8);
+                self.recents_list.append(&empty);
+                return;
+            }
+
+            for rec in recents {
+                let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+                row.add_css_class("search-result-row");
+
+                let icon = gtk::Image::from_icon_name("document-open-recent-symbolic");
+                icon.set_pixel_size(16);
+                row.append(&icon);
+
+                let info_box = gtk::Box::new(gtk::Orientation::Vertical, 2);
+                info_box.set_hexpand(true);
+
+                let name_lbl = gtk::Label::new(Some(&rec.query));
+                name_lbl.add_css_class("place-title");
+                name_lbl.set_xalign(0.0);
+                name_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                info_box.append(&name_lbl);
+
+                let addr_lbl = gtk::Label::new(Some(&rec.formatted_address));
+                addr_lbl.add_css_class("place-desc");
+                addr_lbl.set_xalign(0.0);
+                addr_lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                info_box.append(&addr_lbl);
+
+                row.append(&info_box);
+
+                let rc_clone = rec.clone();
+                let on_sel = self.on_select_place.clone();
+                let gesture = gtk::GestureClick::new();
+                gesture.connect_released(move |_, _, _, _| {
+                    on_sel(SearchResult {
+                        name: rc_clone.query.clone(),
+                        formatted_address: rc_clone.formatted_address.clone(),
+                        lat: rc_clone.lat,
+                        lon: rc_clone.lon,
+                        category: Some("Recent Search".into()),
+                    });
+                });
+                row.add_controller(gesture);
+
+                self.recents_list.append(&row);
             }
         }
     }

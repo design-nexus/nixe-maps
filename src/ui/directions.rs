@@ -37,14 +37,19 @@ impl DirectionsPanel {
     pub fn new(
         db: Database,
         on_route_calculated: impl Fn(RouteResult) + 'static,
+        on_back: impl Fn() + 'static,
         on_close: impl Fn() + 'static,
     ) -> Self {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 10);
         root.add_css_class("panel-body");
         root.set_hexpand(false);
 
-        // Header
-        let header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        // Header with Back, Title, and Close
+        let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let back_btn = widgets::bar_button("go-previous-symbolic", "Back to places");
+        back_btn.connect_clicked(move |_| on_back());
+        header.append(&back_btn);
+
         let title = gtk::Label::new(Some("DIRECTIONS"));
         title.add_css_class("panel-title");
         title.set_hexpand(true);

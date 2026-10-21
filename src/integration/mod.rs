@@ -63,9 +63,14 @@ pub fn parse_deep_link(uri_or_arg: &str) -> Option<DeepLink> {
     }
 
     // 3. nixe-maps://route?start=36.1627,-86.7816&end=35.1495,-90.0490&mode=drive
+    // Also supports start_lat/start_lon & end_lat/end_lon
     if let Some(rest) = s.strip_prefix("nixe-maps://route?") {
         let mut start = None;
         let mut end = None;
+        let mut start_lat = None;
+        let mut start_lon = None;
+        let mut end_lat = None;
+        let mut end_lon = None;
         let mut mode = "drive".to_string();
 
         for param in rest.split('&') {
@@ -73,9 +78,24 @@ pub fn parse_deep_link(uri_or_arg: &str) -> Option<DeepLink> {
                 start = crate::providers::parse_coordinates(v);
             } else if let Some(v) = param.strip_prefix("end=") {
                 end = crate::providers::parse_coordinates(v);
+            } else if let Some(v) = param.strip_prefix("start_lat=") {
+                start_lat = v.parse::<f64>().ok();
+            } else if let Some(v) = param.strip_prefix("start_lon=") {
+                start_lon = v.parse::<f64>().ok();
+            } else if let Some(v) = param.strip_prefix("end_lat=") {
+                end_lat = v.parse::<f64>().ok();
+            } else if let Some(v) = param.strip_prefix("end_lon=") {
+                end_lon = v.parse::<f64>().ok();
             } else if let Some(v) = param.strip_prefix("mode=") {
                 mode = v.to_string();
             }
+        }
+
+        if let (Some(sla), Some(slo)) = (start_lat, start_lon) {
+            start = Some((sla, slo));
+        }
+        if let (Some(ela), Some(elo)) = (end_lat, end_lon) {
+            end = Some((ela, elo));
         }
 
         if let (Some(st), Some(en)) = (start, end) {
