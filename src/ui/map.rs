@@ -18,6 +18,10 @@ pub struct MapView {
 impl MapView {
     pub fn new(initial_lat: f64, initial_lon: f64, initial_zoom: f64, style: MapStyle) -> Self {
         let root = SimpleMap::new();
+        root.set_show_zoom_buttons(false);
+        if let Some(lic) = root.license() {
+            lic.set_visible(false);
+        }
         root.set_hexpand(true);
         root.set_vexpand(true);
 
@@ -123,7 +127,9 @@ impl MapView {
     }
 
     pub fn zoom_in(&self) {
-        if let Some(vp) = self.root.viewport() {
+        if let Some(map) = self.root.map() {
+            map.zoom_in();
+        } else if let Some(vp) = self.root.viewport() {
             let current = vp.zoom_level();
             let max = vp.max_zoom_level() as f64;
             vp.set_zoom_level((current + 1.0).min(max));
@@ -131,7 +137,9 @@ impl MapView {
     }
 
     pub fn zoom_out(&self) {
-        if let Some(vp) = self.root.viewport() {
+        if let Some(map) = self.root.map() {
+            map.zoom_out();
+        } else if let Some(vp) = self.root.viewport() {
             let current = vp.zoom_level();
             let min = vp.min_zoom_level() as f64;
             vp.set_zoom_level((current - 1.0).max(min));
