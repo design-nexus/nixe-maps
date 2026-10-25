@@ -20,9 +20,9 @@ cairo-rs = "0.22"
 pangocairo = "0.22"
 libshumate = { version = "0.8.1", features = ["gtk_v4_18", "v1_7"] }
 
-nixe-core = { path = "../nixe-core/crates/nixe-core" }
-nixe-ui = { path = "../nixe-design/crates/nixe-ui" }
-nixe-theme = { path = "../nixe-design/crates/nixe-theme" }
+nixe-core = { git = "https://github.com/design-nexus/nixe-core.git", rev = "87682e6c936b6a4f006639b1a1c099e96346c07c" }
+nixe-ui = { git = "https://github.com/design-nexus/nixe-design.git", rev = "b8204de80644e263e32783602f2e0ae393578c9e" }
+nixe-theme = { git = "https://github.com/design-nexus/nixe-design.git", rev = "b8204de80644e263e32783602f2e0ae393578c9e" }
 
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
