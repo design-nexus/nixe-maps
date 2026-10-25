@@ -31,10 +31,12 @@ A lightweight, native Linux desktop mapping application built with Rust and GTK4
 sudo pacman -S libshumate gtk4 geoclue
 ```
 
-### Build & Install
+### Install
 ```bash
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/design-nexus/nixe-maps/main/install.sh | bash
 ```
+
+From a checkout, `./install.sh` does the same.
 
 ---
 
