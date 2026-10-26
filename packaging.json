@@ -4,5 +4,26 @@
   "app_id": "io.github.design_nexus.nixe.Maps",
   "description": "Lightweight, native Linux desktop mapping application for Omarchy and Nixe",
   "binary": "nixe-maps",
-  "categories": ["Utility", "Maps", "Geography"]
+  "categories": [
+    "Utility",
+    "Maps",
+    "Geography"
+  ],
+  "application": "maps",
+  "directory": ".",
+  "packages": [
+    "nixe-maps"
+  ],
+  "manifest": "Cargo.toml",
+  "prepare": [],
+  "binaries": [],
+  "test_commands": [
+    [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "nixe-maps"
+    ]
+  ]
 }
