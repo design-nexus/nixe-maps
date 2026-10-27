@@ -1,8 +1,8 @@
-# Nixe Maps
+# Nyx Maps
 
-A lightweight, native Linux desktop mapping application built with Rust and GTK4. Part of the Nixe desktop suite for Omarchy.
+A lightweight, native Linux desktop mapping application built with Rust and GTK4. Part of the Nyx desktop suite for Omarchy.
 
-![Maps Icon](data/icons/io.github.design_nexus.nixe.Maps.svg)
+![Maps Icon](data/icons/io.github.design_nexus.nyx.Maps.svg)
 
 ---
 
@@ -17,10 +17,10 @@ A lightweight, native Linux desktop mapping application built with Rust and GTK4
 - **Turn-by-Turn Directions:** Driving, walking, and cycling route calculation with route polylines, distance, and duration.
 - **Current Location:** GeoClue integration for one-click desktop location detection.
 - **Saved Places:** Fast local SQLite database for favorites, Home, Work, and recent searches.
-- **Nixe Suite Integration:**
+- **Nyx Suite Integration:**
   - Follows Omarchy theme dynamically with live restyling.
-  - Accessible to **Nixe Assistant** via headless CLI (`--api`) and D-Bus.
-  - Deep-link support for **Nixe Glimpse** (`geo:` and `nixe-maps://` schemes).
+  - Accessible to **Nyx Assistant** via headless CLI (`--api`) and D-Bus.
+  - Deep-link support for **Nyx Glimpse** (`geo:` and `nyx-maps://` schemes).
 
 ---
 
@@ -33,7 +33,7 @@ sudo pacman -S libshumate gtk4 geoclue
 
 ### Install
 ```bash
-curl -fsSL https://raw.githubusercontent.com/design-nexus/nixe-maps/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/design-nexus/nyx-maps/main/install.sh | bash
 ```
 
 From a checkout, `./install.sh` does the same.

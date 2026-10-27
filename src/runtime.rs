@@ -5,7 +5,7 @@ use tokio::runtime::Runtime;
 pub static TOKIO: LazyLock<Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_name("nixe-maps-io")
+        .thread_name("nyx-maps-io")
         .build()
         .expect("Failed to initialize background Tokio runtime")
 });

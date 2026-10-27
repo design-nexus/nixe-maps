@@ -1,7 +1,7 @@
 use crate::providers::SearchResult;
 use crate::storage::Database;
 use gtk::prelude::*;
-use nixe_ui::widgets;
+use nyx_ui::widgets;
 use std::cell::RefCell;
 use std::rc::Rc;
 

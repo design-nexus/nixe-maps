@@ -16,7 +16,7 @@ pub struct MapsApp {
 impl MapsApp {
     pub fn new() -> Self {
         let app = gtk::Application::builder()
-            .application_id("io.github.design_nexus.nixe.Maps")
+            .application_id("io.github.design_nexus.nyx.Maps")
             .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE | gio::ApplicationFlags::HANDLES_OPEN)
             .build();
 
@@ -31,7 +31,7 @@ impl MapsApp {
         self.app.connect_startup(move |app| {
             theme::install();
             let win_ref = win_ctrl.clone();
-            nixe_core::control::serve_async(app, control::tools(), move |name, args, reply| {
+            nyx_core::control::serve_async(app, control::tools(), move |name, args, reply| {
                 control::handle(name, args, win_ref.clone(), reply);
             });
         });

@@ -1,18 +1,18 @@
-# Nixe Maps Integration Contracts
+# Nyx Maps Integration Contracts
 
-This document specifies the integration protocols and examples for **Nixe Assistant** and **Nixe Glimpse**.
+This document specifies the integration protocols and examples for **Nyx Assistant** and **Nyx Glimpse**.
 
 ---
 
-## 1. Nixe Assistant Integration
+## 1. Nyx Assistant Integration
 
-Nixe Assistant can access geographic and mapping capabilities either headlessly via CLI JSON or over D-Bus without launching the full user interface.
+Nyx Assistant can access geographic and mapping capabilities either headlessly via CLI JSON or over D-Bus without launching the full user interface.
 
 ### Headless CLI API (`--api`)
 
 #### 1.1 Location Search
 ```bash
-nixe-maps --api search "Nashville"
+nyx-maps --api search "Nashville"
 ```
 Output:
 ```json
@@ -29,7 +29,7 @@ Output:
 
 #### 1.2 Distance & Travel Time Calculation
 ```bash
-nixe-maps --api distance "36.1627,-86.7816" "35.1495,-90.0490" drive
+nyx-maps --api distance "36.1627,-86.7816" "35.1495,-90.0490" drive
 ```
 Output:
 ```json
@@ -44,7 +44,7 @@ Output:
 
 #### 1.3 Full Route
 ```bash
-nixe-maps --api route "36.1627,-86.7816" "35.1495,-90.0490" drive
+nyx-maps --api route "36.1627,-86.7816" "35.1495,-90.0490" drive
 ```
 
 ### Assistant Ability Manifest Example (`plugin.toml`)
@@ -52,14 +52,14 @@ nixe-maps --api route "36.1627,-86.7816" "35.1495,-90.0490" drive
 manifest_version = 1
 id = "maps"
 version = "1.0.0"
-description = "Maps and routing capabilities powered by Nixe Maps"
-executable = "nixe-maps"
+description = "Maps and routing capabilities powered by Nyx Maps"
+executable = "nyx-maps"
 args = ["--api"]
 tools = ["maps.search", "maps.distance", "maps.route"]
 
 [[routes]]
 pattern = "^(?i:show (?P<location>.+) on (?:the )?map)$"
-exec = ["nixe-maps", "--search", "{location}"]
+exec = ["nyx-maps", "--search", "{location}"]
 
 [[routes]]
 pattern = "^(?i:how far is (?P<destination>.+))$"
@@ -67,29 +67,29 @@ tool = "maps.distance"
 
 [[routes]]
 pattern = "^(?i:get directions (?:to |from )?(?P<rest>.+))$"
-exec = ["nixe-maps", "nixe-maps://route?{rest}"]
+exec = ["nyx-maps", "nyx-maps://route?{rest}"]
 ```
 
 ---
 
-## 2. Nixe Glimpse Integration
+## 2. Nyx Glimpse Integration
 
-Glimpse executes commands to launch Nixe Maps with coordinates, places, or routes pre-selected.
+Glimpse executes commands to launch Nyx Maps with coordinates, places, or routes pre-selected.
 
 ### Supported Commands
-- `map Nashville` -> `nixe-maps "Nashville"`
-- `map 35.1495,-90.0490` -> `nixe-maps "35.1495,-90.0490"`
-- `route home to work` -> `nixe-maps "nixe-maps://route?start=home&end=work"`
+- `map Nashville` -> `nyx-maps "Nashville"`
+- `map 35.1495,-90.0490` -> `nyx-maps "35.1495,-90.0490"`
+- `route home to work` -> `nyx-maps "nyx-maps://route?start=home&end=work"`
 - `geo:36.1627,-86.7816` -> Standard RFC 5870 URI handled by desktop launcher.
 
 ---
 
 ## 3. D-Bus Interface
 
-When Nixe Maps is running, it registers a session bus service:
-- **Bus Name:** `io.github.design_nexus.nixe.Maps`
-- **Object Path:** `/io/github/design_nexus/nixe/Maps`
-- **Interface:** `io.github.design_nexus.nixe.Maps`
+When Nyx Maps is running, it registers a session bus service:
+- **Bus Name:** `io.github.design_nexus.nyx.Maps`
+- **Object Path:** `/io/github/design_nexus/nyx/Maps`
+- **Interface:** `io.github.design_nexus.nyx.Maps`
 
 ### Methods:
 1. `ShowLocation(f64 lat, f64 lon, String label)`: Centers the map on the coordinate, places a marker, and displays place details.

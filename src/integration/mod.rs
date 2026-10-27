@@ -37,8 +37,8 @@ pub fn parse_deep_link(uri_or_arg: &str) -> Option<DeepLink> {
         }
     }
 
-    // 2. nixe-maps://show?lat=36.1627&lon=-86.7816&label=Nashville
-    if let Some(rest) = s.strip_prefix("nixe-maps://show?") {
+    // 2. nyx-maps://show?lat=36.1627&lon=-86.7816&label=Nashville
+    if let Some(rest) = s.strip_prefix("nyx-maps://show?") {
         let mut lat = None;
         let mut lon = None;
         let mut label = "Selected Location".to_string();
@@ -62,9 +62,9 @@ pub fn parse_deep_link(uri_or_arg: &str) -> Option<DeepLink> {
         }
     }
 
-    // 3. nixe-maps://route?start=36.1627,-86.7816&end=35.1495,-90.0490&mode=drive
+    // 3. nyx-maps://route?start=36.1627,-86.7816&end=35.1495,-90.0490&mode=drive
     // Also supports start_lat/start_lon & end_lat/end_lon
-    if let Some(rest) = s.strip_prefix("nixe-maps://route?") {
+    if let Some(rest) = s.strip_prefix("nyx-maps://route?") {
         let mut start = None;
         let mut end = None;
         let mut start_lat = None;
@@ -143,9 +143,9 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_deep_link_nixe_maps() {
+    fn test_parse_deep_link_nyx_maps() {
         assert_eq!(
-            parse_deep_link("nixe-maps://show?lat=35.1495&lon=-90.0490&label=Memphis"),
+            parse_deep_link("nyx-maps://show?lat=35.1495&lon=-90.0490&label=Memphis"),
             Some(DeepLink::Location {
                 lat: 35.1495,
                 lon: -90.0490,
@@ -154,7 +154,7 @@ mod tests {
         );
 
         assert_eq!(
-            parse_deep_link("nixe-maps://route?start=36.1627,-86.7816&end=35.1495,-90.0490&mode=drive"),
+            parse_deep_link("nyx-maps://route?start=36.1627,-86.7816&end=35.1495,-90.0490&mode=drive"),
             Some(DeepLink::Route {
                 start: (36.1627, -86.7816),
                 end: (35.1495, -90.0490),

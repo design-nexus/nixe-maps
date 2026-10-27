@@ -1,5 +1,5 @@
 use anyhow::Result;
-use nixe_core::paths;
+use nyx_core::paths;
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -31,7 +31,7 @@ pub struct Database {
 
 impl Database {
     pub fn open() -> Result<Self> {
-        let db_dir = paths::data_home().join("nixe-maps");
+        let db_dir = paths::data_home().join("nyx-maps");
         fs::create_dir_all(&db_dir)?;
         let db_path = db_dir.join("maps.db");
         let conn = Connection::open(db_path)?;

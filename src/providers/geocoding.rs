@@ -102,7 +102,7 @@ pub async fn search_places(query: &str, api_key: &str) -> Result<Vec<SearchResul
     }
 
     let client = reqwest::Client::builder()
-        .user_agent("nixe-maps/1.0 (https://github.com/design-nexus/nixe-maps)")
+        .user_agent("nyx-maps/1.0 (https://github.com/design-nexus/nyx-maps)")
         .build()?;
 
     // 2. Geoapify API if key configured
@@ -187,7 +187,7 @@ pub async fn search_nearby(
     api_key: &str,
 ) -> Result<Vec<SearchResult>> {
     let client = reqwest::Client::builder()
-        .user_agent("nixe-maps/1.0 (https://github.com/design-nexus/nixe-maps)")
+        .user_agent("nyx-maps/1.0 (https://github.com/design-nexus/nyx-maps)")
         .build()?;
 
     // 1. Geoapify Places API v2 if API key is provided

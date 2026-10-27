@@ -3,7 +3,7 @@ use crate::settings;
 use crate::storage::Database;
 use gtk::glib;
 use gtk::prelude::*;
-use nixe_ui::widgets;
+use nyx_ui::widgets;
 use std::cell::RefCell;
 use std::rc::Rc;
 

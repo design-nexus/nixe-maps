@@ -3,7 +3,7 @@ use crate::storage::Database;
 use crate::theme;
 use crate::ui::widgets::{self, Page};
 use gtk::prelude::*;
-use nixe_ui::settings_card::{self, Spec};
+use nyx_ui::settings_card::{self, Spec};
 
 const GROUPS: &[(&str, &str, &str)] = &[
     ("This window", "applications-graphics-symbolic", "Theme, glow, motion"),
@@ -37,7 +37,7 @@ fn build_content(p: &Page, db: &Database) {
 
 fn window_group(p: &Page) {
     let group = p.group("This window");
-    group.add(&nixe_ui::widgets::start_row());
+    group.add(&nyx_ui::widgets::start_row());
     let current_prefs = settings::get();
 
     let options: Vec<(String, String)> = theme::all()

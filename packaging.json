@@ -1,9 +1,9 @@
 {
-  "name": "nixe-maps",
+  "name": "nyx-maps",
   "version": "0.1.0",
-  "app_id": "io.github.design_nexus.nixe.Maps",
-  "description": "Lightweight, native Linux desktop mapping application for Omarchy and Nixe",
-  "binary": "nixe-maps",
+  "app_id": "io.github.design_nexus.nyx.Maps",
+  "description": "Lightweight, native Linux desktop mapping application for Omarchy and Nyx",
+  "binary": "nyx-maps",
   "categories": [
     "Utility",
     "Maps",
@@ -12,7 +12,7 @@
   "application": "maps",
   "directory": ".",
   "packages": [
-    "nixe-maps"
+    "nyx-maps"
   ],
   "manifest": "Cargo.toml",
   "prepare": [],
@@ -23,7 +23,7 @@
       "test",
       "--locked",
       "-p",
-      "nixe-maps"
+      "nyx-maps"
     ]
   ]
 }

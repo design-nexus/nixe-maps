@@ -1,4 +1,4 @@
-pub use nixe_ui::widgets::*;
+pub use nyx_ui::widgets::*;
 
 use gtk::prelude::*;
 

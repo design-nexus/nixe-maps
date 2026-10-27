@@ -3,27 +3,27 @@ set -euo pipefail
 # Piped from curl (`curl -fsSL …/install.sh | bash`): no checkout here, so fetch
 # the source and run its installer from there.
 if [[ -z ${BASH_SOURCE[0]:-} ]]; then
-  command -v git >/dev/null || { echo "Git is needed to install nixe-maps." >&2; exit 1; }
+  command -v git >/dev/null || { echo "Git is needed to install nyx-maps." >&2; exit 1; }
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT
-  git clone -q --depth 1 https://github.com/design-nexus/nixe-maps.git "$work/src"
+  git clone -q --depth 1 https://github.com/design-nexus/nyx-maps.git "$work/src"
   bash "$work/src/install.sh" "$@"
   exit
 fi
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 # A release archive (.prebuilt) brings its binaries.
-if [[ ${NIXE_SKIP_BUILD:-0} != 1 && ! -f $root/.prebuilt ]]; then
+if [[ ${NYX_SKIP_BUILD:-0} != 1 && ! -f $root/.prebuilt ]]; then
   cargo build --release --manifest-path "$root/Cargo.toml"
 fi
 
 share="${XDG_DATA_HOME:-$HOME/.local/share}"
-binary="${CARGO_TARGET_DIR:-$root/target}/release/nixe-maps"
+binary="${CARGO_TARGET_DIR:-$root/target}/release/nyx-maps"
 [[ -f $binary ]] || { echo "Release binary missing: $binary" >&2; exit 1; }
 
-install -Dm755 "$binary" "$HOME/.local/bin/nixe-maps"
-install -Dm644 "$root/data/io.github.design_nexus.nixe.Maps.desktop" "$share/applications/io.github.design_nexus.nixe.Maps.desktop"
-install -Dm644 "$root/data/icons/io.github.design_nexus.nixe.Maps.svg" "$share/icons/hicolor/scalable/apps/io.github.design_nexus.nixe.Maps.svg"
+install -Dm755 "$binary" "$HOME/.local/bin/nyx-maps"
+install -Dm644 "$root/data/io.github.design_nexus.nyx.Maps.desktop" "$share/applications/io.github.design_nexus.nyx.Maps.desktop"
+install -Dm644 "$root/data/icons/io.github.design_nexus.nyx.Maps.svg" "$share/icons/hicolor/scalable/apps/io.github.design_nexus.nyx.Maps.svg"
 
 # Install custom action icons
 mkdir -p "$share/icons/hicolor/scalable/actions"
@@ -41,4 +41,4 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
   gtk-update-icon-cache -q -t "$share/icons/hicolor" || true
 fi
 
-printf 'Installed Nixe Maps without opening it.\n'
+printf 'Installed Nyx Maps without opening it.\n'

@@ -3,7 +3,7 @@ use crate::settings;
 use crate::ui::MainWindow;
 use gtk::glib;
 use gtk::prelude::*;
-use nixe_core::control::Reply;
+use nyx_core::control::Reply;
 use serde_json::{json, Value};
 use std::cell::RefCell;
 use std::rc::Rc;

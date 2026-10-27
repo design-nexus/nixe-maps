@@ -1,5 +1,5 @@
-use nixe_core::paths;
-pub use nixe_theme::{ThemeMode, ThemePrefs};
+use nyx_core::paths;
+pub use nyx_theme::{ThemeMode, ThemePrefs};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -110,7 +110,7 @@ impl Default for Settings {
 
 impl Settings {
     pub fn config_path() -> PathBuf {
-        paths::config_home().join("nixe-maps").join("settings.toml")
+        paths::config_home().join("nyx-maps").join("settings.toml")
     }
 
     pub fn load() -> Self {

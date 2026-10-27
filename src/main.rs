@@ -14,8 +14,8 @@ use app::MapsApp;
 use integration::handle_cli_api;
 
 fn main() -> glib::ExitCode {
-    nixe_core::app::init(nixe_core::app::App {
-        slug: "nixe-maps",
+    nyx_core::app::init(nyx_core::app::App {
+        slug: "nyx-maps",
         name: "Maps",
     });
 
@@ -26,7 +26,7 @@ fn main() -> glib::ExitCode {
 
     let args: Vec<String> = std::env::args().skip(1).collect();
 
-    // Headless API query check for Nixe Assistant / scripts
+    // Headless API query check for Nyx Assistant / scripts
     if !args.is_empty() && args[0] == "--api" {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()

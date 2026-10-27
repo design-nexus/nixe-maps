@@ -143,7 +143,7 @@ pub async fn calculate_route(
     api_key: &str,
 ) -> Result<RouteResult> {
     let client = reqwest::Client::builder()
-        .user_agent("nixe-maps/1.0 (https://github.com/design-nexus/nixe-maps)")
+        .user_agent("nyx-maps/1.0 (https://github.com/design-nexus/nyx-maps)")
         .build()?;
 
     // 1. Try Geoapify Routing API if key is present

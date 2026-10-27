@@ -47,7 +47,7 @@ async fn request_geoclue_location() -> Result<GeoLocation> {
             &(
                 "org.freedesktop.GeoClue2.Client",
                 "DesktopId",
-                zbus::zvariant::Value::from("io.github.design_nexus.nixe.Maps"),
+                zbus::zvariant::Value::from("io.github.design_nexus.nyx.Maps"),
             ),
         )
         .await;

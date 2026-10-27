@@ -1,8 +1,8 @@
 use crate::settings;
-pub use nixe_theme::*;
+pub use nyx_theme::*;
 
 pub fn install_icons() {
-    let dir = nixe_core::paths::cache_home().join("nixe-maps/icons");
+    let dir = nyx_core::paths::cache_home().join("nyx-maps/icons");
     let _ = std::fs::create_dir_all(&dir);
     const ICONS: &[(&str, &str)] = &[
         ("directions-symbolic", include_str!("../data/icons/directions-symbolic.svg")),
@@ -27,7 +27,7 @@ pub fn install_icons() {
 pub fn install() {
     install_icons();
 
-    nixe_theme::install(Style {
+    nyx_theme::install(Style {
         window_class: "maps-window",
         base_skip: &[],
         css: include_str!("style.css"),
