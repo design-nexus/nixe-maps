@@ -125,8 +125,9 @@ impl SearchBar {
         let me = self.clone_parts();
 
         self.entry.connect_changed(move |e| {
-            if *suppress.borrow() {
-                *suppress.borrow_mut() = false;
+            // Text set by the app (one change can be two signals), or typed somewhere else:
+            // no search. Only what's typed into the focused field searches.
+            if *suppress.borrow() || !focused(e) {
                 return;
             }
             picked.set(false);
@@ -197,11 +198,8 @@ impl SearchBar {
 
     /// Set the text without searching for it.
     pub fn set_text(&self, text: &str) {
-        *self.suppress_search.borrow_mut() = true;
-        self.entry.set_text(text);
-        if self.entry.text() != text {
-            *self.suppress_search.borrow_mut() = false;
-        }
+        set_quietly(&self.entry, &self.suppress_search, text);
+        self.popover.popdown();
     }
 
     pub fn text(&self) -> String {
@@ -219,7 +217,8 @@ impl SearchBar {
         self.picked.set(on);
     }
 
-    /// Search for what's typed now and show the list to choose from.
+    /// Search for what's typed now and show the list to choose from (the field takes
+    /// the focus, as the list belongs to it).
     pub fn search_now(&self) {
         let text = self.text();
         if !text.is_empty() {
@@ -231,6 +230,7 @@ impl SearchBar {
     pub fn show_results(&self, query_label: &str, places: Vec<SearchResult>) {
         self.set_text(query_label);
         *self.current_search_id.borrow_mut() += 1;
+        self.entry.grab_focus();
         self.picker().show(places);
     }
 
@@ -314,6 +314,9 @@ impl Picker {
     }
 
     fn show_empty(&self) {
+        if !focused(&self.entry) {
+            return;
+        }
         self.clear();
         self.shown.borrow_mut().clear();
         let note = gtk::Label::new(Some("No places found. Try another name or an address."));
@@ -325,6 +328,10 @@ impl Picker {
     }
 
     fn show(&self, places: Vec<SearchResult>) {
+        // The list opens only under the field being typed in.
+        if !focused(&self.entry) {
+            return;
+        }
         self.clear();
         let units = settings::get().units;
         for place in &places {
@@ -390,14 +397,22 @@ impl Picker {
         self.popover.popdown();
         let _ = self.db.add_recent_search(&place.name, &place.formatted_address, place.lat, place.lon);
         if self.fills {
-            *self.suppress.borrow_mut() = true;
-            self.entry.set_text(&place.name);
-            if self.entry.text() != place.name.as_str() {
-                *self.suppress.borrow_mut() = false;
-            }
+            set_quietly(&self.entry, &self.suppress, &place.name);
             self.entry.set_position(-1);
         }
         self.picked.set(true);
         (self.on_select)(place);
     }
+}
+
+/// The field has the keyboard focus (its text part does, inside the entry).
+fn focused(entry: &gtk::Entry) -> bool {
+    entry.state_flags().contains(gtk::StateFlags::FOCUS_WITHIN)
+}
+
+/// Set `entry`'s text with searching held off for the whole change.
+fn set_quietly(entry: &gtk::Entry, suppress: &Rc<RefCell<bool>>, text: &str) {
+    *suppress.borrow_mut() = true;
+    entry.set_text(text);
+    *suppress.borrow_mut() = false;
 }
