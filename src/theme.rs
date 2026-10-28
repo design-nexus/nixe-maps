@@ -26,6 +26,7 @@ pub fn install_icons() {
 
 pub fn install() {
     install_icons();
+    nyx_theme::use_design_2();
 
     nyx_theme::install(Style {
         window_class: "maps-window",

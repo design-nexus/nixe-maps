@@ -15,6 +15,8 @@ pub struct MapView {
     route_start_marker: Rc<RefCell<Option<Marker>>>,
     route_end_marker: Rc<RefCell<Option<Marker>>>,
     current_style: Rc<RefCell<MapStyle>>,
+    /// Shumate zoom minus the app's zoom (256 px tiles): 1 for half-size high-DPI tiles.
+    zoom_offset: Rc<std::cell::Cell<f64>>,
 }
 
 impl MapView {
@@ -28,7 +30,6 @@ impl MapView {
         root.set_vexpand(true);
 
         let viewport = root.viewport().expect("SimpleMap has viewport");
-        viewport.set_zoom_level(initial_zoom);
         viewport.set_location(initial_lat, initial_lon);
 
         let marker_layer = MarkerLayer::new(&viewport);
@@ -36,9 +37,10 @@ impl MapView {
         route_layer.set_stroke(true);
         route_layer.set_closed(false);
 
-        // Styling for route line
-        let route_color = gdk::RGBA::new(0.35, 0.60, 0.98, 0.95);
-        route_layer.set_stroke_color(Some(&route_color));
+        // The route in the app's accent.
+        let route_color = gdk::RGBA::parse(nyx_theme::app_accent("maps").as_str())
+            .unwrap_or_else(|_| gdk::RGBA::new(0.35, 0.60, 0.98, 1.0));
+        route_layer.set_stroke_color(Some(&gdk::RGBA::new(route_color.red(), route_color.green(), route_color.blue(), 0.95)));
         route_layer.set_stroke_width(6.0);
 
         root.add_overlay_layer(&route_layer);
@@ -53,19 +55,30 @@ impl MapView {
             route_start_marker: Rc::new(RefCell::new(None)),
             route_end_marker: Rc::new(RefCell::new(None)),
             current_style: Rc::new(RefCell::new(style)),
+            zoom_offset: Rc::new(std::cell::Cell::new(0.0)),
         };
 
         view.set_style(style, "", "");
+        if let Some(vp) = view.root.viewport() {
+            vp.set_zoom_level(initial_zoom + view.zoom_offset.get());
+        }
         view
     }
 
+    /// Show `style`, keeping the place and scale on screen: sources with smaller tiles
+    /// count zoom levels from a different start.
     pub fn set_style(&self, style: MapStyle, custom_sat: &str, custom_topo: &str) {
         *self.current_style.borrow_mut() = style;
         let renderer = create_renderer(style, custom_sat, custom_topo);
+        let zoom = self.root.viewport().map(|vp| vp.zoom_level() - self.zoom_offset.get());
+        let offset = (256.0 / renderer.tile_size().max(1) as f64).log2();
+        self.zoom_offset.set(offset);
         self.root.set_map_source(Some(&renderer));
+        if let (Some(vp), Some(z)) = (self.root.viewport(), zoom) {
+            vp.set_zoom_level(z + offset);
+        }
     }
 
-    #[allow(dead_code)]
     pub fn current_style(&self) -> MapStyle {
         *self.current_style.borrow()
     }
@@ -74,7 +87,7 @@ impl MapView {
         if let Some(viewport) = self.root.viewport() {
             viewport.set_location(lat, lon);
             if let Some(z) = zoom {
-                viewport.set_zoom_level(z);
+                viewport.set_zoom_level(z + self.zoom_offset.get());
             }
         }
     }
@@ -239,7 +252,7 @@ impl MapView {
 
     pub fn get_viewport_state(&self) -> (f64, f64, f64) {
         if let Some(vp) = self.root.viewport() {
-            (vp.latitude(), vp.longitude(), vp.zoom_level())
+            (vp.latitude(), vp.longitude(), vp.zoom_level() - self.zoom_offset.get())
         } else {
             (0.0, 0.0, 0.0)
         }

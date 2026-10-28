@@ -1,6 +1,7 @@
 use crate::providers::{RouteResult, TravelMode, calculate_route, format_distance, format_duration};
 use crate::settings;
 use crate::storage::Database;
+use crate::ui::search::{Near, SearchBar};
 use gtk::glib;
 use gtk::prelude::*;
 use nyx_ui::widgets;
@@ -10,8 +11,8 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct DirectionsPanel {
     pub root: gtk::Box,
-    pub origin_entry: gtk::Entry,
-    pub dest_entry: gtk::Entry,
+    origin: Rc<SearchBar>,
+    dest: Rc<SearchBar>,
     pub get_route_btn: gtk::Button,
     #[allow(dead_code)]
     mode_drive: gtk::Button,
@@ -36,8 +37,10 @@ pub struct DirectionsPanel {
 }
 
 impl DirectionsPanel {
+    /// `near` says where searches should look first (you, or the map's centre).
     pub fn new(
         db: Database,
+        near: Near,
         on_route_calculated: impl Fn(RouteResult) + 'static,
     ) -> Self {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -94,17 +97,23 @@ impl DirectionsPanel {
         let fields_vbox = gtk::Box::new(gtk::Orientation::Vertical, 6);
         fields_vbox.set_hexpand(true);
 
-        let origin_entry = gtk::Entry::new();
-        origin_entry.set_placeholder_text(Some("Starting point (or 'My Location')"));
-        origin_entry.add_css_class("waypoint-entry");
-        origin_entry.set_width_chars(18);
-        fields_vbox.append(&origin_entry);
+        let current_origin: Rc<RefCell<Option<(f64, f64)>>> = Rc::new(RefCell::new(None));
+        let current_dest: Rc<RefCell<Option<(f64, f64)>>> = Rc::new(RefCell::new(None));
 
-        let dest_entry = gtk::Entry::new();
-        dest_entry.set_placeholder_text(Some("Destination"));
-        dest_entry.add_css_class("waypoint-entry");
-        dest_entry.set_width_chars(18);
-        fields_vbox.append(&dest_entry);
+        // Start and destination: type a name or an address and pick from the places
+        // found, nearest first.
+        let co = current_origin.clone();
+        let origin = Rc::new(SearchBar::field(db.clone(), "Start (My Location)", near.clone(), move |p| {
+            *co.borrow_mut() = Some((p.lat, p.lon));
+        }));
+        fields_vbox.append(&origin.root);
+        let cd = current_dest.clone();
+        let dest = Rc::new(SearchBar::field(db.clone(), "Search for a destination", near, move |p| {
+            *cd.borrow_mut() = Some((p.lat, p.lon));
+        }));
+        fields_vbox.append(&dest.root);
+        let origin_entry = origin.entry.clone();
+        let dest_entry = dest.entry.clone();
 
         inputs_box.append(&fields_vbox);
 
@@ -158,19 +167,17 @@ impl DirectionsPanel {
         scroller.set_child(Some(&content));
         root.append(&scroller);
 
-        let current_origin = Rc::new(RefCell::new(None));
-        let current_dest = Rc::new(RefCell::new(None));
-
         // Connect reverse button
-        let o_ent = origin_entry.clone();
-        let d_ent = dest_entry.clone();
+        let (o_bar, d_bar) = (origin.clone(), dest.clone());
         let co_clone = current_origin.clone();
         let cd_clone = current_dest.clone();
         reverse_btn.connect_clicked(move |_| {
-            let o_text = o_ent.text().to_string();
-            let d_text = d_ent.text().to_string();
-            o_ent.set_text(&d_text);
-            d_ent.set_text(&o_text);
+            let (o_text, d_text) = (o_bar.text(), d_bar.text());
+            let (o_pick, d_pick) = (o_bar.has_pick(), d_bar.has_pick());
+            o_bar.set_text(&d_text);
+            d_bar.set_text(&o_text);
+            o_bar.set_picked(d_pick);
+            d_bar.set_picked(o_pick);
 
             let old_o = *co_clone.borrow();
             let old_d = *cd_clone.borrow();
@@ -227,21 +234,21 @@ impl DirectionsPanel {
         let btn_clone = get_route_btn.clone();
         let db_c = db.clone();
 
-        let co_ch = current_origin.clone();
-        origin_entry.connect_changed(move |ent| {
-            let t = ent.text();
-            if t.is_empty() {
+        // Editing a field forgets the place it held.
+        let (co_ch, o_bar) = (current_origin.clone(), origin.clone());
+        origin_entry.connect_changed(move |_| {
+            if !o_bar.has_pick() {
                 *co_ch.borrow_mut() = None;
             }
         });
-
-        let cd_ch = current_dest.clone();
-        dest_entry.connect_changed(move |ent| {
-            if ent.text().is_empty() {
+        let (cd_ch, d_bar) = (current_dest.clone(), dest.clone());
+        dest_entry.connect_changed(move |_| {
+            if !d_bar.has_pick() {
                 *cd_ch.borrow_mut() = None;
             }
         });
 
+        let (o_pick, d_pick) = (origin.clone(), dest.clone());
         get_route_btn.connect_clicked(move |_| {
             let mut o_str = o_e.text().trim().to_string();
             let d_str = d_e.text().trim().to_string();
@@ -257,9 +264,23 @@ impl DirectionsPanel {
             }
 
             if o_str.is_empty() || d_str.is_empty() {
-                st_lbl.set_text("Please enter both origin and destination.");
+                st_lbl.set_text("Choose a start and a destination.");
                 st_lbl.set_visible(true);
                 return;
+            }
+
+            // A name that isn't a picked place: show the places it could be, rather than
+            // guessing the first one.
+            for (text, coords, bar, what) in [
+                (&o_str, *co_c.borrow(), &o_pick, "start"),
+                (&d_str, *cd_c.borrow(), &d_pick, "destination"),
+            ] {
+                if coords.is_none() && !is_known_point(text) {
+                    bar.search_now();
+                    st_lbl.set_text(&format!("Pick the {what} from the list."));
+                    st_lbl.set_visible(true);
+                    return;
+                }
             }
 
             st_lbl.set_text("Calculating route...");
@@ -330,8 +351,8 @@ impl DirectionsPanel {
 
         Self {
             root,
-            origin_entry,
-            dest_entry,
+            origin,
+            dest,
             get_route_btn,
             mode_drive,
             mode_walk,
@@ -348,13 +369,15 @@ impl DirectionsPanel {
     }
 
     pub fn set_origin(&self, lat: f64, lon: f64, text: &str) {
+        self.origin.set_text(text);
+        self.origin.set_picked(true);
         *self.current_origin.borrow_mut() = Some((lat, lon));
-        self.origin_entry.set_text(text);
     }
 
     pub fn set_destination(&self, lat: f64, lon: f64, text: &str) {
+        self.dest.set_text(text);
+        self.dest.set_picked(true);
         *self.current_dest.borrow_mut() = Some((lat, lon));
-        self.dest_entry.set_text(text);
     }
 
     pub fn calculate_route(&self) {
@@ -424,6 +447,13 @@ fn populate_route(
 
         steps_list.append(&row);
     }
+}
+
+/// Words and forms the route can find without a list: you, coordinates, home and work.
+fn is_known_point(text: &str) -> bool {
+    let t = text.trim();
+    ["my location", "current location", "here", "me", "home", "work"].iter().any(|w| t.eq_ignore_ascii_case(w))
+        || crate::providers::parse_coordinates(t).is_some()
 }
 
 async fn resolve_point(text: &str, api_key: &str, db: &Database) -> Option<(f64, f64)> {

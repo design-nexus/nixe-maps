@@ -10,7 +10,7 @@ A lightweight, native Linux desktop mapping application built with Rust and GTK4
 
 - **Interactive Maps:** Smooth panning, touchpad zooming, mouse wheel navigation, and keyboard controls powered by `libshumate`.
 - **Three Map Styles:**
-  - **Standard:** OpenStreetMap street data.
+  - **Standard:** OpenStreetMap data as sharp vector tiles from OpenFreeMap, drawn in your theme's light or dark colors.
   - **Topographic:** OpenTopoMap terrain and elevation contours.
   - **Satellite:** High-resolution aerial imagery via Esri World Imagery (or custom tile template).
 - **Search & Autocomplete:** Search for street addresses, cities, landmarks, businesses, or direct coordinates (`lat, lon`).

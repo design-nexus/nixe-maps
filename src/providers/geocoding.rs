@@ -85,6 +85,94 @@ struct NominatimPlace {
 }
 
 pub async fn search_places(query: &str, api_key: &str) -> Result<Vec<SearchResult>> {
+    search_places_near(query, api_key, None).await
+}
+
+/// Great-circle distance in metres.
+pub fn distance_m(a: (f64, f64), b: (f64, f64)) -> f64 {
+    let (la1, lo1, la2, lo2) = (a.0.to_radians(), a.1.to_radians(), b.0.to_radians(), b.1.to_radians());
+    let h = ((la2 - la1) / 2.0).sin().powi(2) + la1.cos() * la2.cos() * ((lo2 - lo1) / 2.0).sin().powi(2);
+    6_371_000.0 * 2.0 * h.sqrt().asin()
+}
+
+#[derive(Debug, Deserialize)]
+struct PhotonCollection {
+    features: Vec<PhotonFeature>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PhotonFeature {
+    geometry: PhotonGeometry,
+    properties: PhotonProperties,
+}
+
+#[derive(Debug, Deserialize)]
+struct PhotonGeometry {
+    coordinates: (f64, f64),
+}
+
+#[derive(Debug, Deserialize)]
+struct PhotonProperties {
+    name: Option<String>,
+    housenumber: Option<String>,
+    street: Option<String>,
+    city: Option<String>,
+    state: Option<String>,
+    postcode: Option<String>,
+    country: Option<String>,
+    osm_key: Option<String>,
+    osm_value: Option<String>,
+}
+
+/// Photon (komoot's OpenStreetMap geocoder): made for search as you type, and it
+/// favours places near `near`. Stops and parking lots named after a place are dropped,
+/// so "walmart" finds the store, not its bus stop.
+async fn photon(client: &reqwest::Client, query: &str, near: Option<(f64, f64)>) -> Result<Vec<SearchResult>> {
+    let mut url = format!("https://photon.komoot.io/api/?q={}&limit=12&lang=en", urlencoding::encode(query));
+    if let Some((lat, lon)) = near {
+        url.push_str(&format!("&lat={lat:.5}&lon={lon:.5}"));
+    }
+    let data: PhotonCollection = client.get(&url).send().await?.error_for_status()?.json().await?;
+    let mut results: Vec<SearchResult> = data
+        .features
+        .into_iter()
+        .filter(|f| {
+            let key = f.properties.osm_key.as_deref().unwrap_or("");
+            let value = f.properties.osm_value.as_deref().unwrap_or("");
+            !(key == "highway" || key == "public_transport" || (key == "amenity" && value == "parking"))
+        })
+        .map(|f| {
+            let p = f.properties;
+            let street = match (&p.housenumber, &p.street) {
+                (Some(n), Some(s)) => Some(format!("{n} {s}")),
+                (None, Some(s)) => Some(s.clone()),
+                _ => None,
+            };
+            let name = p.name.clone().or_else(|| street.clone()).unwrap_or_else(|| "Place".into());
+            let place = [street, p.city, p.state, p.postcode, p.country]
+                .into_iter()
+                .flatten()
+                .filter(|part| *part != name)
+                .collect::<Vec<_>>()
+                .join(", ");
+            SearchResult {
+                name,
+                formatted_address: place,
+                lat: f.geometry.coordinates.1,
+                lon: f.geometry.coordinates.0,
+                category: p.osm_value,
+            }
+        })
+        .collect();
+    if let Some(here) = near {
+        results.sort_by(|a, b| distance_m(here, (a.lat, a.lon)).total_cmp(&distance_m(here, (b.lat, b.lon))));
+    }
+    results.truncate(8);
+    Ok(results)
+}
+
+/// Places matching `query`, nearest to `near` first when it's given.
+pub async fn search_places_near(query: &str, api_key: &str, near: Option<(f64, f64)>) -> Result<Vec<SearchResult>> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(Vec::new());
@@ -107,11 +195,14 @@ pub async fn search_places(query: &str, api_key: &str) -> Result<Vec<SearchResul
 
     // 2. Geoapify API if key configured
     if !api_key.trim().is_empty() {
-        let url = format!(
-            "https://api.geoapify.com/v1/geocode/search?text={}&format=json&apiKey={}&limit=6",
+        let mut url = format!(
+            "https://api.geoapify.com/v1/geocode/search?text={}&format=json&apiKey={}&limit=8",
             urlencoding::encode(query),
             api_key.trim()
         );
+        if let Some((lat, lon)) = near {
+            url.push_str(&format!("&bias=proximity:{lon:.5},{lat:.5}"));
+        }
 
         let resp = client.get(&url).send().await?;
         if resp.status().is_success() {
@@ -145,7 +236,14 @@ pub async fn search_places(query: &str, api_key: &str) -> Result<Vec<SearchResul
         }
     }
 
-    // 3. Nominatim Fallback (Zero-config out of box)
+    // 3. Photon: no key needed, near-first.
+    if let Ok(results) = photon(&client, query, near).await
+        && !results.is_empty()
+    {
+        return Ok(results);
+    }
+
+    // 4. Nominatim, if Photon is unreachable.
     let url = format!(
         "https://nominatim.openstreetmap.org/search?format=json&q={}&limit=5",
         urlencoding::encode(query)

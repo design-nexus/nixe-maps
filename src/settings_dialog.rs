@@ -6,7 +6,7 @@ use gtk::prelude::*;
 use nyx_ui::settings_card::{self, Spec};
 
 const GROUPS: &[(&str, &str, &str)] = &[
-    ("This window", "applications-graphics-symbolic", "Theme, glow, motion"),
+    ("This window", "applications-graphics-symbolic", "Theme, accent, motion"),
     ("Providers", "preferences-system-network-symbolic", "Geoapify API key, tile servers"),
     ("Navigation", "emblem-favorite-symbolic", "Units, travel modes"),
     ("Places", "user-home-symbolic", "Home, work, history"),
@@ -83,16 +83,7 @@ fn window_group(p: &Page) {
     }
     group.add(&theme_row);
 
-    let (row, _) = widgets::switch_row(
-        "Glow",
-        "Soft accent glow around focused and selected elements.",
-        current_prefs.glow,
-        |on| {
-            settings::update(|s| s.glow = on);
-            theme::apply();
-        },
-    );
-    group.add(&row);
+    group.add(&nyx_ui::widgets::accent_row("maps"));
 
     let (row, _) = widgets::switch_row(
         "Reduce motion",

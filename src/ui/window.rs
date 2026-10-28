@@ -55,16 +55,13 @@ impl MainWindow {
         let overlay = gtk::Overlay::new();
         let main_vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
 
-        // --- TOP BAR ---
-        let topbar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        topbar.add_css_class("maps-topbar");
-
+        // --- HEADER ---
+        // The app and the side panel's toggle; search in the middle; the map's centre,
+        // its style, directions, locate and Settings at the end.
+        let header = chrome::app_header(&window, "mark-location-symbolic", "Maps");
         let sidebar_toggle = widgets::bar_button("sidebar-show-symbolic", "Toggle side panel (Ctrl+B)");
-        topbar.append(&sidebar_toggle);
-
-        let app_title = gtk::Label::new(Some("Maps"));
-        app_title.add_css_class("maps-title-accent");
-        topbar.append(&app_title);
+        header.start.append(&sidebar_toggle);
+        header.end.set_spacing(4);
 
         let cur_style = MapStyle::from_str(&initial_settings.map_style);
         let style_btn = gtk::Button::with_label(&format!("{} ▾", cur_style.display_name()));
@@ -93,22 +90,31 @@ impl MainWindow {
 
         let sp_clone = style_popover.clone();
         style_btn.connect_clicked(move |_| sp_clone.popup());
-        topbar.append(&style_btn);
 
-        // Search Bar Holder
         let search_holder = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        search_holder.set_hexpand(true);
-        topbar.append(&search_holder);
+        header.center.append(&search_holder);
 
-        // Directions Button
+        let (start_lat, start_lon) = match (initial_settings.last_current_lat, initial_settings.last_current_lon) {
+            (Some(lat), Some(lon)) => (lat, lon),
+            _ => (initial_settings.last_lat, initial_settings.last_lon),
+        };
+        let coords_lbl = gtk::Label::new(Some(&format!("{:.4}, {:.4}", start_lat, start_lon)));
+        coords_lbl.add_css_class("header-status");
+        coords_lbl.set_margin_end(4);
+        header.end.append(&coords_lbl);
+        header.end.append(&style_btn);
         let directions_toggle = widgets::bar_button("directions-symbolic", "Directions (Ctrl+R)");
-        topbar.append(&directions_toggle);
-
-        // Locate Me Button
+        header.end.append(&directions_toggle);
         let locate_btn = widgets::bar_button("find-location-symbolic", "Find my location");
-        topbar.append(&locate_btn);
+        header.end.append(&locate_btn);
+        let overlay_gear = overlay.clone();
+        let win_gear = window.clone();
+        let db_gear = database.clone();
+        header.end.append(&chrome::settings_button(move || {
+            settings_dialog::open(&overlay_gear, &win_gear, db_gear.clone());
+        }));
 
-        main_vbox.append(&topbar);
+        main_vbox.append(&header.root);
 
         // --- BODY (SIDE PANEL + MAP) ---
         let body_hbox = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -154,11 +160,6 @@ impl MainWindow {
 
         body_hbox.append(&side_panel);
 
-        let (start_lat, start_lon) = match (initial_settings.last_current_lat, initial_settings.last_current_lon) {
-            (Some(lat), Some(lon)) => (lat, lon),
-            _ => (initial_settings.last_lat, initial_settings.last_lon),
-        };
-
         // Map View
         let map_view = MapView::new(
             start_lat,
@@ -203,39 +204,16 @@ impl MainWindow {
         zoom_box.append(&zoom_out_btn);
 
         map_overlay.add_overlay(&zoom_box);
+        // The tiles' credit, small in the map's corner (their terms ask for it on the map).
+        let attribution_lbl = gtk::Label::new(Some(cur_style.attribution()));
+        attribution_lbl.add_css_class("map-attribution");
+        attribution_lbl.set_halign(gtk::Align::End);
+        attribution_lbl.set_valign(gtk::Align::End);
+        attribution_lbl.set_ellipsize(gtk::pango::EllipsizeMode::Start);
+        attribution_lbl.set_can_target(false);
+        map_overlay.add_overlay(&attribution_lbl);
         body_hbox.append(&map_overlay);
         main_vbox.append(&body_hbox);
-
-        // --- STATUS BAR ---
-        let statusbar = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-        statusbar.add_css_class("maps-statusbar");
-
-        let shortcuts_btn = chrome::shortcuts_button(|| {
-            show_shortcuts();
-        });
-        statusbar.append(&shortcuts_btn);
-
-        let status_spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        status_spacer.set_hexpand(true);
-        statusbar.append(&status_spacer);
-
-        let coords_lbl = gtk::Label::new(Some(&format!("{:.4}, {:.4}", start_lat, start_lon)));
-        coords_lbl.add_css_class("dim");
-        statusbar.append(&coords_lbl);
-
-        let attribution_lbl = gtk::Label::new(Some(cur_style.attribution()));
-        attribution_lbl.add_css_class("dim");
-        statusbar.append(&attribution_lbl);
-
-        let overlay_gear = overlay.clone();
-        let win_gear = window.clone();
-        let db_gear = database.clone();
-        let gear_btn = chrome::gear(move || {
-            settings_dialog::open(&overlay_gear, &win_gear, db_gear.clone());
-        });
-        statusbar.append(&gear_btn);
-
-        main_vbox.append(&statusbar);
         overlay.set_child(Some(&main_vbox));
 
         // Toast label overlay
@@ -253,8 +231,21 @@ impl MainWindow {
         // --- CONSTRUCT SUB-PANELS ---
         // 1. Directions Panel
         let mv_dir = map_view.clone();
+        // Directions look for places near you first, else near the map's centre.
+        let mv_near = map_view.clone();
+        let near_you: crate::ui::search::Near = Rc::new(move || {
+            let s = settings::get();
+            match (s.last_current_lat, s.last_current_lon) {
+                (Some(lat), Some(lon)) => Some((lat, lon)),
+                _ => {
+                    let (lat, lon, _) = mv_near.get_viewport_state();
+                    Some((lat, lon))
+                }
+            }
+        });
         let directions_panel = Rc::new(DirectionsPanel::new(
             database.clone(),
+            near_you,
             move |route| {
                 mv_dir.show_route(&route.coordinates);
             },
@@ -436,7 +427,14 @@ impl MainWindow {
             sp_search.set_visible(true);
             phv_search.refresh();
         }));
+        let mv_center = map_view.clone();
+        search_bar.set_near(Rc::new(move || {
+            let (lat, lon, _) = mv_center.get_viewport_state();
+            Some((lat, lon))
+        }));
         *search_bar_cell.borrow_mut() = Some(search_bar.clone());
+        search_holder.set_margin_start(12);
+        search_holder.set_margin_end(12);
         search_holder.append(&search_bar.root);
 
         // Wire Segment buttons
@@ -489,8 +487,38 @@ impl MainWindow {
             btn_sat,
             style_popover,
         );
+        main_win.follow_vector_tiles();
 
         main_win
+    }
+
+    /// Picks up OpenFreeMap's current tile build (the first run has none yet, so the
+    /// Standard map starts as raster), and draws the Standard map again when the theme
+    /// changes, as its colours come from it.
+    fn follow_vector_tiles(self: &Rc<Self>) {
+        let (sender, receiver) = async_channel::bounded(1);
+        crate::runtime::spawn(async move {
+            let _ = sender.send(crate::providers::refresh_vector_tiles().await).await;
+        });
+        let me = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            if let Ok(Some(_)) = receiver.recv().await
+                && let Some(me) = me.upgrade()
+                && me.map_view.current_style() == MapStyle::Standard
+            {
+                me.set_map_style(MapStyle::Standard);
+            }
+        });
+        let me = Rc::downgrade(self);
+        let last = std::cell::RefCell::new(nyx_theme::palette());
+        nyx_theme::subscribe(&self.window, move || {
+            let Some(me) = me.upgrade() else { return };
+            let now = nyx_theme::palette();
+            if *last.borrow() != now && me.map_view.current_style() == MapStyle::Standard {
+                me.set_map_style(MapStyle::Standard);
+            }
+            *last.borrow_mut() = now;
+        });
     }
 
     fn bind_events(
@@ -816,6 +844,7 @@ impl MainWindow {
 
     pub fn search_query(&self, query: &str) {
         self.search_bar.set_text(query);
+        self.search_bar.search_now();
     }
 }
 
@@ -861,7 +890,7 @@ mod tests {
             false,
         );
 
-        let dp = DirectionsPanel::new(db, |_| {});
+        let dp = DirectionsPanel::new(db, Rc::new(|| None), |_| {});
 
         let panel_stack = gtk::Stack::new();
         panel_stack.set_hexpand(false);

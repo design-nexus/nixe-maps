@@ -15,8 +15,10 @@ pub struct MapsApp {
 
 impl MapsApp {
     pub fn new() -> Self {
+        // NYX_MAPS_APP_ID runs a test copy beside the real one (its own window class).
+        let id = std::env::var("NYX_MAPS_APP_ID").unwrap_or_else(|_| "io.github.design_nexus.nyx.Maps".into());
         let app = gtk::Application::builder()
-            .application_id("io.github.design_nexus.nyx.Maps")
+            .application_id(id)
             .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE | gio::ApplicationFlags::HANDLES_OPEN)
             .build();
 
@@ -41,7 +43,10 @@ impl MapsApp {
             if win_ref.borrow().is_none() {
                 let win = MainWindow::build(application);
                 win.window.present();
-                win.check_location_on_startup();
+                // A test copy never asks for the location (a new app ID could prompt).
+                if std::env::var_os("NYX_MAPS_APP_ID").is_none() {
+                    win.check_location_on_startup();
+                }
                 *win_ref.borrow_mut() = Some(win);
             } else if let Some(ref win) = *win_ref.borrow() {
                 win.window.present();
