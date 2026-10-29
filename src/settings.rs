@@ -20,6 +20,9 @@ pub struct Settings {
     #[serde(default = "default_style")]
     pub map_style: String,
 
+    #[serde(default = "default_travel_mode")]
+    pub travel_mode: String,
+
     #[serde(default)]
     pub custom_satellite_url: String,
 
@@ -60,6 +63,8 @@ pub struct Settings {
     pub work_lon: Option<f64>,
 }
 
+fn default_travel_mode() -> String { "drive".into() }
+
 fn default_style() -> String {
     "standard".to_string()
 }
@@ -89,6 +94,7 @@ impl Default for Settings {
             reduce_motion: false,
             geoapify_api_key: String::new(),
             map_style: default_style(),
+            travel_mode: default_travel_mode(),
             custom_satellite_url: String::new(),
             custom_topo_url: String::new(),
             units: default_units(),

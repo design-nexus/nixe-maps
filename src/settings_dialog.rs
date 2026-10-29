@@ -125,6 +125,14 @@ fn navigation_group(p: &Page) {
     let group = p.group("Navigation");
     let current = settings::get();
 
+    let (row, _) = widgets::choice_row("Default travel mode", "Mode used when Maps next opens.",
+        vec![("drive".into(), "Drive".into()), ("walk".into(), "Walk".into()), ("bicycle".into(), "Cycle".into())],
+        &current.travel_mode, |id| settings::update(|s| s.travel_mode = id));
+    group.add(&row);
+    let (row, _) = widgets::choice_row("Map style", "Style used when Maps next opens. You can also change it above the map.",
+        vec![("standard".into(), "Standard".into()), ("topographic".into(), "Topographic".into()), ("satellite".into(), "Satellite".into())],
+        &current.map_style, |id| settings::update(|s| s.map_style = id));
+    group.add(&row);
     let unit_options = vec![
         ("imperial".into(), "Imperial (miles, feet)".into()),
         ("metric".into(), "Metric (kilometers, meters)".into()),
@@ -145,6 +153,8 @@ fn navigation_group(p: &Page) {
 fn places_group(p: &Page, db: &Database) {
     let group = p.group("Places");
 
+    saved_place_row(&group, db, "home", "Home");
+    saved_place_row(&group, db, "work", "Work");
     let db_c = db.clone();
     let (row, _) = widgets::button_row(
         "Clear recent searches",
@@ -159,3 +169,23 @@ fn places_group(p: &Page, db: &Database) {
     group.add(&row);
 }
 
+
+fn saved_place_row(group: &widgets::Group, db: &Database, label: &'static str, title: &str) {
+    let database = db.clone();
+    let status = gtk::Label::new(None);
+    status.set_wrap(true);
+    status.set_xalign(0.0);
+    status.add_css_class("dim");
+    let message = status.clone();
+    let picker = crate::ui::search::SearchBar::field(db.clone(), "Search an address", std::rc::Rc::new(|| None), move |place| {
+        match database.add_favorite(&place.name, label, place.lat, place.lon, &place.formatted_address) {
+            Ok(_) => message.set_text("Saved"),
+            Err(_) => message.set_text("Could not save this place"),
+        }
+    });
+    if let Ok(Some(place)) = db.get_favorite_by_label(label) {
+        picker.entry.set_text(&place.address);
+    }
+    group.add(&widgets::row(title, "Choose a search result to save this address.", Some(picker.root.upcast_ref())));
+    group.add(&status);
+}

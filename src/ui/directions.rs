@@ -79,7 +79,7 @@ impl DirectionsPanel {
         };
 
         let mode_drive = make_mode_btn("drive-symbolic", "Drive");
-        mode_drive.add_css_class("active");
+        let initial_mode = TravelMode::from_str(&crate::settings::get().travel_mode);
         let mode_walk = make_mode_btn("walk-symbolic", "Walk");
         let mode_cycle = make_mode_btn("bicycle-symbolic", "Cycle");
 
@@ -88,7 +88,12 @@ impl DirectionsPanel {
         mode_box.append(&mode_cycle);
         content.append(&mode_box);
 
-        let current_mode = Rc::new(RefCell::new(TravelMode::Drive));
+        match initial_mode {
+            TravelMode::Drive => mode_drive.add_css_class("active"),
+            TravelMode::Walk => mode_walk.add_css_class("active"),
+            TravelMode::Bicycle => mode_cycle.add_css_class("active"),
+        }
+        let current_mode = Rc::new(RefCell::new(initial_mode));
 
         // Origin and Destination inputs
         let inputs_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
