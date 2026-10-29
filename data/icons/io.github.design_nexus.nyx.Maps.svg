@@ -1,41 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="mapBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e1e2e"/>
-      <stop offset="100%" stop-color="#181825"/>
-    </linearGradient>
-    <linearGradient id="foldGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#89b4fa" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#89b4fa" stop-opacity="0.12"/>
-    </linearGradient>
-    <linearGradient id="foldGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#89b4fa" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#89b4fa" stop-opacity="0.20"/>
-    </linearGradient>
-    <linearGradient id="pinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#f38ba8"/>
-      <stop offset="100%" stop-color="#d20f39"/>
-    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#26262a"/><stop offset="1" stop-color="#121214"/></linearGradient>
+    <radialGradient id="glow" cx=".2" cy=".1" r=".9"><stop stop-color="#86baff" stop-opacity=".22"/><stop offset="1" stop-color="#86baff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#86baff"/><stop offset="1" stop-color="#4b8ef5"/></linearGradient>
   </defs>
-  <!-- Background squircle -->
-  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#mapBg)" stroke="#313244" stroke-width="2"/>
-  
-  <!-- Map folds -->
-  <!-- Left panel -->
-  <polygon points="26,38 52,30 52,94 26,102" fill="url(#foldGrad1)" stroke="#89b4fa" stroke-width="1.5" stroke-linejoin="round"/>
-  <!-- Middle panel -->
-  <polygon points="52,30 76,40 76,104 52,94" fill="url(#foldGrad2)" stroke="#89b4fa" stroke-width="1.5" stroke-linejoin="round"/>
-  <!-- Right panel -->
-  <polygon points="76,40 102,32 102,96 76,104" fill="url(#foldGrad1)" stroke="#89b4fa" stroke-width="1.5" stroke-linejoin="round"/>
-  
-  <!-- Contour road lines -->
-  <path d="M 28,68 Q 42,60 52,62 T 76,70 T 100,64" fill="none" stroke="#cdd6f4" stroke-width="2" stroke-linecap="round" stroke-dasharray="3,3" opacity="0.6"/>
-  <path d="M 30,82 Q 44,78 52,80 T 76,86 T 98,82" fill="none" stroke="#89b4fa" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
-  
-  <!-- Map Pin -->
-  <g transform="translate(64, 46)">
-    <circle cx="0" cy="0" r="14" fill="url(#pinGrad)" filter="drop-shadow(0px 3px 6px rgba(0,0,0,0.5))"/>
-    <path d="M -9.9,9.9 L 0,22 L 9.9,9.9 Z" fill="url(#pinGrad)"/>
-    <circle cx="0" cy="0" r="5" fill="#ffffff"/>
-  </g>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#tile)"/>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#glow)"/>
+  <rect x="8.5" y="8.5" width="111" height="111" rx="27.5" fill="none" stroke="#86baff" stroke-opacity=".3"/>
+  <path d="M24 38L52 28L78 38L104 28V94L78 104L52 94L24 104Z" fill="#86baff" fill-opacity=".35"/>
+  <path d="M52 28L78 38V104L52 94Z M54 48a16 16 0 1 1 32 0Q86 62 70 80Q54 62 54 48Z" fill="url(#ink)"/>
+  <path d="M70 44v.01" fill="none" stroke="#151517" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
