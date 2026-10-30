@@ -964,5 +964,14 @@ fn show_shortcuts() {
     }
 
     card.append(&list);
+    let close = gtk::Button::with_label("Close");
+    close.set_halign(gtk::Align::End);
+    let weak = dialog.downgrade();
+    close.connect_clicked(move |_| {
+        if let Some(dialog) = weak.upgrade() {
+            dialog.close();
+        }
+    });
+    card.append(&close);
     dialog.present();
 }
